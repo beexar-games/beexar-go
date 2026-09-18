@@ -1,0 +1,7 @@
+{
+  "endpoint": "/finish",
+  "kind": "ledger",
+  "headers": {
+    "X-REQUEST-SIGN": "11202d7a095fa464e5915e047a4141f3ea7926c1d70b53a402c2e4becb3d0a31"
+  }
+}

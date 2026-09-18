@@ -1,0 +1,268 @@
+openapi: 3.0.3
+info:
+  title: Beexar Gateway API
+  description: |
+    Base Gateway API: the platform-agnostic public surface (game catalog +
+    health). Inbound game-launch endpoints are platform-specific and live in
+    per-platform specs under api/{platform}/gateway.yaml (e.g.
+    api/softswiss/gateway.yaml), each with its own auth scheme.
+
+    Shared error schemas are defined in api/common/schemas.yaml and referenced
+    here and from every platform spec.
+  version: v.2026.06.09
+
+servers:
+  - url: https://gateway.beexar.com
+    description: Beexar Gateway API
+
+tags:
+  - name: catalog
+    description: Game catalog endpoints (public, no auth)
+
+security: []
+
+paths:
+  /api/v1/operator/games:
+    get:
+      operationId: operatorGames
+      tags: [catalog]
+      summary: List available games for an operator
+      description: |
+        Public endpoint — no authentication required.
+        Returns the list of games configured for the given operator.
+        Supports JSON (default), XML, and YAML response formats via the `format`
+        query parameter or `Accept` header content negotiation.
+      parameters:
+        - name: operator
+          in: query
+          required: false
+          description: "Operator slug (optional, omit for all games)"
+          schema:
+            type: string
+            example: casinoxyz
+        - name: format
+          in: query
+          required: false
+          description: "Response format (overrides Accept header). Default: json"
+          schema:
+            type: string
+            enum: [json, xml, yaml]
+            default: json
+        - name: active
+          in: query
+          required: false
+          description: "Filter active games only. Default: true"
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: List of games
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperatorGamesResponse'
+        '404':
+          description: Operator not found (code NOT_FOUND)
+          content:
+            application/json:
+              schema:
+                $ref: './common/schemas.yaml#/components/schemas/Problem'
+
+  /api/v1/preloader:
+    get:
+      operationId: preloader
+      tags: [catalog]
+      summary: Branded loading-screen tokens for a game launch
+      description: |
+        Public, unauthenticated, cache-first endpoint that returns ONLY the
+        branded loading-screen ("preloader") slice of a game's Theme DSL — a
+        handful of CSS custom-property values plus the logo URL — resolved by
+        operator slug + game slug.
+
+        It lets a game frontend fetch and paint the operator's branded
+        preloader from an inline `<script>` in `index.html` BEFORE the large JS
+        bundle loads. The heavier session-based `GET /api/v1/config` still
+        drives the full theme once the app boots.
+
+        The endpoint never fails a launch on branding resolution: an unknown
+        operator/game, a backoffice outage, or a resolve timeout all degrade to
+        the game's neutral default tokens (HTTP 200). Responses are safe to
+        cache briefly at the browser/edge (`Cache-Control: public, max-age=30`).
+      parameters:
+        - name: operator
+          in: query
+          required: false
+          description: "Operator slug (from the launch URL). Omitted/unknown → defaults."
+          schema:
+            type: string
+            example: casinoxyz
+        - name: game
+          in: query
+          required: false
+          description: "Game slug (from the launch URL). Omitted/unknown → defaults."
+          schema:
+            type: string
+            example: crash
+      responses:
+        '200':
+          description: |
+            Preloader branding tokens. Always 200 — a failed resolution returns
+            the game's neutral default tokens rather than an error, so the boot
+            script can paint a consistent look regardless.
+          headers:
+            Cache-Control:
+              description: Browser/edge cache hint for this public, non-sensitive response.
+              schema:
+                type: string
+                example: public, max-age=30
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreloaderBranding'
+
+  /health:
+    get:
+      operationId: healthCheck
+      summary: Health check endpoint
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - status
+            - service
+          properties:
+            status:
+              type: string
+              example: ok
+            service:
+              type: string
+              example: gateway-service
+
+    OperatorGamesResponse:
+      type: object
+      required: [games]
+      properties:
+        games:
+          type: array
+          items:
+            $ref: '#/components/schemas/GameInfo'
+
+    PreloaderBranding:
+      type: object
+      description: |
+        Minimal branded-preloader payload consumed by the inline boot script.
+      required: [vars]
+      properties:
+        vars:
+          type: object
+          description: |
+            CSS custom-property names mapped directly to values (e.g.
+            `--color-preloader-bg`). The client applies them verbatim with a
+            plain `setProperty` loop — no key mapping. Always present (may be
+            empty for a game type without preloader defaults).
+          additionalProperties:
+            type: string
+          example:
+            "--color-preloader-bg": "#101010"
+            "--color-preloader-spinner": "#ff8800"
+        logoUrl:
+          type: string
+          description: |
+            Preloader logo: an absolute URL or a storage key the client
+            prefixes with `CDN_URL` (mirrors the frontend `resolveURL`).
+            Omitted when the game ships no logo and none is configured.
+          example: brand/splash.png
+
+    GameInfo:
+      type: object
+      required:
+        - title
+        - identifier
+        - category
+        - feature_group
+        - payout
+        - volatility_rating
+        - has_freespins
+        - bonus_buy
+        - demo_available
+        - thumbnail
+        - currencies
+        - restrictions
+      properties:
+        title:
+          type: string
+          description: Game display name
+          example: Lucky Slots
+        identifier:
+          type: string
+          description: Game slug (unique identifier)
+          example: slot
+        category:
+          type: string
+          description: Game type
+          enum: [dice, plinko, slots, crash]
+          example: slots
+        feature_group:
+          type: string
+          description: Operator slug
+          example: casinoxyz
+        payout:
+          type: number
+          format: double
+          description: RTP in percent
+          example: 96.0
+        volatility_rating:
+          type: string
+          description: Volatility level
+          enum: [low, medium, high, very_high]
+          example: high
+        has_freespins:
+          type: boolean
+          description: Whether the game supports free spins
+        bonus_buy:
+          type: boolean
+          description: Whether the game supports bonus buy
+        demo_available:
+          type: boolean
+          description: Whether demo mode is available
+        thumbnail:
+          type: string
+          format: uri
+          description: >-
+            Game thumbnail image URL. Returns the operator-uploaded per-game
+            catalog image when one is set (for global games, the owner's image);
+            otherwise fail-softly falls back to a single platform default catalog
+            image (the same 640×640 default for every game type), so the field is
+            always a usable URL.
+          example: https://cdn.beexar.com/defaults/catalog/default-640x640.png
+        currencies:
+          type: array
+          items:
+            type: string
+          description: Supported currencies
+        restrictions:
+          type: object
+          properties:
+            default:
+              type: object
+              properties:
+                blacklist:
+                  type: array
+                  items:
+                    type: string
+                  description: Blacklisted country codes

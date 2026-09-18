@@ -1,0 +1,5 @@
+{
+  "endpoint": "/balance",
+  "kind": "transport",
+  "headers": {}
+}

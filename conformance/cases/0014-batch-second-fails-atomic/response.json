@@ -1,0 +1,12 @@
+{
+  "status": 400,
+  "body": {
+    "code": "invalid_argument",
+    "msg": "insufficient funds",
+    "meta": {
+      "api_code": "100",
+      "api_message": "insufficient funds",
+      "balance": "100.00"
+    }
+  }
+}

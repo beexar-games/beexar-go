@@ -1,0 +1,11 @@
+{
+  "status": 500,
+  "body": {
+    "code": "internal",
+    "msg": "internal error",
+    "meta": {
+      "api_code": "500",
+      "api_message": "internal error"
+    }
+  }
+}

@@ -1,0 +1,403 @@
+openapi: 3.0.3
+info:
+  title: Beexar Gateway API - SoftSwiss
+  description: |
+    SoftSwiss Game Aggregator inbound integration (Provider API v2 style).
+    These are the endpoints a SoftSwiss-integrated operator calls to launch
+    games. Each platform has its OWN spec, endpoints, and auth scheme; this
+    one uses HMAC-SHA256 (X-REQUEST-SIGN) over the raw request body.
+
+    ## Authentication
+
+    Each request must be signed using HMAC-SHA256. The signature is calculated
+    over the raw request body using the operator's AUTH_TOKEN (API secret) as
+    key. The hex-encoded signature is sent in the `X-REQUEST-SIGN` header.
+
+    For frontend demo sessions (browser-initiated), send 64 zero characters
+    as the signature value.
+
+    ## Operator gating
+
+    An operator may only call the endpoints for its own `integration_type`.
+    Calling a SoftSwiss endpoint as a non-SoftSwiss operator returns 403
+    `INTEGRATION_TYPE_MISMATCH`.
+  version: v.2026.06.20
+
+servers:
+  - url: https://gateway.beexar.com
+    description: Beexar Gateway API
+
+tags:
+  - name: softswiss-launcher
+    description: SoftSwiss game launcher endpoints
+
+security: []
+
+paths:
+  /api/v1/softswiss/launcher/real:
+    post:
+      operationId: softswissLauncherReal
+      tags: [softswiss-launcher]
+      summary: Launch a real-money game session (SoftSwiss)
+      description: |
+        Called by a SoftSwiss-integrated operator to launch a real-money game
+        for a player. Authentication via HMAC-SHA256 signature of the request
+        body.
+      security:
+        - requestSign: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LauncherRealRequest'
+      responses:
+        '200':
+          description: Game launch URL created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LauncherResponse'
+        '400':
+          description: |
+            Client error. `code` is always `invalid_argument`; the specific
+            meaning is in `meta.api_code` — 400 malformed body, 404 casino_id
+            unknown or mismatched, 405 game not available, 410 casino disabled,
+            420 endpoint not available for this integration_type, 154 currency
+            not allowed / needs a feature subscription / bet limits missing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: |
+            Invalid request signature. This is the ONLY case answered with 403;
+            `code` is `invalid_argument` and `meta.api_code` is `403`. Feature
+            subscription and integration_type mismatches are 400 (api_code 154
+            and 420 respectively).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/softswiss/launcher/demo:
+    post:
+      operationId: softswissLauncherDemo
+      tags: [softswiss-launcher]
+      summary: Launch a demo game session (SoftSwiss)
+      description: |
+        Launch a demo game session with virtual balance. Supports two modes:
+        - Operator mode: signed request from the casino backend.
+        - Frontend mode: X-REQUEST-SIGN set to 64 zero characters, operator
+          resolved by casino_id slug.
+      security:
+        - requestSign: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LauncherDemoRequest'
+      responses:
+        '200':
+          description: Demo game launch URL created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LauncherResponse'
+        '400':
+          description: |
+            Client error. `code` is always `invalid_argument`; the specific
+            meaning is in `meta.api_code` — 400 malformed body, 404 casino_id
+            unknown or mismatched, 405 game not available, 410 casino disabled,
+            420 endpoint not available for this integration_type, 154 currency
+            not allowed / needs a feature subscription / bet limits missing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: |
+            Invalid request signature. This is the ONLY case answered with 403;
+            `code` is `invalid_argument` and `meta.api_code` is `403`. Feature
+            subscription and integration_type mismatches are 400 (api_code 154
+            and 420 respectively).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    requestSign:
+      type: apiKey
+      name: X-REQUEST-SIGN
+      in: header
+      description: |
+        HMAC-SHA256 signature of the raw request body (hex-encoded, 64 characters).
+        Key: operator's AUTH_TOKEN (API secret).
+        For frontend demo sessions: send 64 zero characters.
+
+  schemas:
+    # Mirrors the SoftSwiss LauncherRealRequest field-for-field.
+    # additionalProperties: true ON PURPOSE — SoftSwiss operators send fields
+    # beexar does not model (gender, currency_play, created_at, …); they are
+    # ACCEPTED and passed through, just not processed. Rejecting an unknown field
+    # would break a valid request. Field constraints (patterns, lengths) match
+    # SoftSwiss so beexar is never stricter. `session_payload` is a beexar-only
+    # optional extension.
+    LauncherRealRequest:
+      type: object
+      additionalProperties: true
+      required:
+        - casino_id
+        - game
+        - account
+      properties:
+        casino_id:
+          type: string
+          minLength: 1
+          description: Casino identifier (operator slug)
+        game:
+          type: string
+          minLength: 1
+          description: Game identifier (game slug)
+        locale:
+          type: string
+          pattern: '^[a-zA-Z]{2}$|^[a-zA-Z]{2}[-_][a-zA-Z]{2}$|^en-soc$'
+          description: 'Player locale (ISO 639-1, optional region: en / en-gb / en_gb / en-soc)'
+        ip:
+          type: string
+          description: Player IP address (IPv4 or IPv6)
+        client_type:
+          type: string
+          enum: [mobile, desktop]
+          description: Client device type
+        urls:
+          $ref: '#/components/schemas/LauncherURLs'
+        account:
+          $ref: '#/components/schemas/Account'
+        jurisdiction:
+          type: string
+          pattern: '^[A-Z]{2}(-[A-Z]{2})?$'
+          description: Two-letter country code, supports region identifiers (e.g. CA-ON)
+        session_id:
+          type: string
+          minLength: 1
+          description: Unique session identifier in UUID format for round tracking
+        session_payload:
+          type: string
+          maxLength: 4096
+          description: Opaque string returned in wallet callbacks (beexar extension)
+
+    LauncherDemoRequest:
+      type: object
+      # Accept (and pass through) operator extra fields without processing them.
+      additionalProperties: true
+      required:
+        - casino_id
+        - game
+      properties:
+        casino_id:
+          type: string
+          minLength: 1
+          description: Casino identifier (operator slug)
+        game:
+          type: string
+          minLength: 1
+          description: Game identifier (game slug)
+        locale:
+          type: string
+          pattern: '^[a-zA-Z]{2}$|^[a-zA-Z]{2}[-_][a-zA-Z]{2}$|^en-soc$'
+          description: 'UI language (ISO 639-1, optional region: en / en-gb / en-soc)'
+        ip:
+          type: string
+          description: Player IP address (IPv4 or IPv6)
+        client_type:
+          type: string
+          enum: [mobile, desktop]
+          description: Client device type
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 32
+          pattern: '^[A-Z][A-Z0-9_]{2,31}$'
+          default: USD
+          description: >-
+            Virtual balance currency (beexar extension), canonical UPPERCASE
+            format. Either a SoftSwiss ISO-4217 fiat/crypto code (3-4 chars,
+            e.g. USD, EUR, USDT) OR a beexar operator custom-currency code
+            carrying the CUSTOM_ prefix (e.g. CUSTOM_WIN). The bound matches the
+            platform canonical currency shape money.IsValidCurrencyCode
+            (^[A-Z][A-Z0-9_]{2,31}$).
+        player_id:
+          type: string
+          maxLength: 64
+          description: Anonymous player identifier (generated by frontend, stored in localStorage)
+        balance:
+          type: string
+          maxLength: 40
+          pattern: "^[0-9]+(\\.[0-9]+)?$"
+          default: "10000"
+          description: Initial virtual balance amount (beexar extension)
+        urls:
+          type: object
+          properties:
+            return_url:
+              type: string
+              pattern: '^(https?|app):\/\/([^\/?#]+)([^?#]*)(\?[^#]*)?(#.*)?$'
+              description: URL to redirect after closing game
+        jurisdiction:
+          type: string
+          pattern: '^[A-Z]{2}(-[A-Z]{2})?$'
+          description: Two-letter country code, supports region identifiers (e.g. CA-ON)
+
+    LauncherResponse:
+      type: object
+      required:
+        - launch_url
+      properties:
+        launch_url:
+          type: string
+          format: uri
+          description: Full URL to launch the game
+
+    # SoftSwiss-native error envelope (provider API v2, examples/provider-api.yaml).
+    # The launcher endpoints return THIS on every error — NOT a generic Problem — so
+    # a SoftSwiss-integrated operator's client can parse it (one-way compatibility:
+    # beexar conforms to SoftSwiss, never deviates). `code` is the Twirp code; the
+    # specific machine-readable meaning is in `meta.api_code` (registry in
+    # backend/gateway-service/internal/service/operator/softswiss/codes.go); the
+    # human-readable reason — including WHICH field was wrong and what is expected —
+    # goes in `msg` and `meta.api_message` (free text, permitted by the contract).
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - meta
+      properties:
+        code:
+          type: string
+          description: 'Twirp error code: invalid_argument (4xx) or internal (5xx).'
+          example: invalid_argument
+        msg:
+          type: string
+          description: Human-readable error message (names the field / reason).
+        meta:
+          $ref: '#/components/schemas/ErrorResponseMeta'
+
+    ErrorResponseMeta:
+      type: object
+      required:
+        - api_code
+        - api_message
+      properties:
+        api_code:
+          type: string
+          description: SoftSwiss API error code (e.g. 400, 403, 405, 154, 500).
+          example: "400"
+        api_message:
+          type: string
+          description: API error message — the specific reason / offending field.
+
+    # Mirrors SoftSwiss LauncherRealRequestUrls: the SoftSwiss URL pattern (which
+    # also allows the app:// scheme), not a stricter `format: uri` + maxLength.
+    LauncherURLs:
+      type: object
+      properties:
+        return_url:
+          type: string
+          pattern: '^(https?|app):\/\/([^\/?#]+)([^?#]*)(\?[^#]*)?(#.*)?$'
+          description: URL to redirect player after game
+        deposit_url:
+          type: string
+          pattern: '^(https?|app):\/\/([^\/?#]+)([^?#]*)(\?[^#]*)?(#.*)?$'
+          description: URL for player to make a deposit
+
+    # Player account — mirrors the SoftSwiss provider-API `Account` definition
+    # (examples/provider-api.yaml) field-for-field, so beexar validates EXACTLY
+    # what SoftSwiss does and never rejects a SoftSwiss-valid request by being
+    # stricter. additionalProperties: true — operator account extras (e.g.
+    # gender) are accepted and passed through, just not processed. `email` is a
+    # beexar-only optional extension (SoftSwiss has no such field).
+    #
+    # DOCUMENTED DEVIATION (audit low-10): `id` carries an explicit maxLength: 255.
+    # SoftSwiss itself does not bound the account id, but the operator-supplied id
+    # is persisted verbatim into VARCHAR(255) columns (player_profiles.player_id,
+    # player_game_state.player_id, round_actions.player_id,
+    # outbox_tasks.player_id). An
+    # id over 255 chars would otherwise pass contract validation and blow up as a
+    # 500 at the DB write. The bound turns that into a clean 400 at the edge. It
+    # is a superset of every realistic SoftSwiss id, so no valid request is
+    # rejected. Other string fields need no such bound: `nickname` is truncated to
+    # 64 before storage (petname.SanitizeOperatorNickname), `country` is already
+    # pinned to 2 chars by its pattern, and firstname/lastname land in a JSONB
+    # `account` column with no width limit.
+    Account:
+      type: object
+      additionalProperties: true
+      required:
+        - id
+        - currency
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Player account identifier on casino side
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 32
+          pattern: '^[A-Z][A-Z0-9_]{2,31}$'
+          description: >-
+            Player account currency in canonical UPPERCASE format: either a
+            SoftSwiss ISO-4217 fiat or crypto code (3-4 chars, e.g. USD, EUR,
+            USDT) OR a beexar operator custom-currency code carrying the CUSTOM_
+            prefix (e.g. CUSTOM_WIN). The bound matches the platform canonical
+            currency shape money.IsValidCurrencyCode (^[A-Z][A-Z0-9_]{2,31}$) —
+            a superset of every SoftSwiss code, so no SoftSwiss-valid request is
+            rejected. Lowercase / mixed-case is rejected with a validation
+            error — the operator must send the canonical case (we do not
+            silently normalize).
+        firstname:
+          type: string
+        lastname:
+          type: string
+        nickname:
+          type: string
+          description: Player nickname (may be displayed in the game)
+        email:
+          type: string
+          description: Player email (beexar optional extension; not a SoftSwiss field)
+        date_of_birth:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?Z$'
+          description: 'Player birth date — SoftSwiss time format, e.g. 1999-12-31T15:30:00Z'
+        registered_at:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?Z$'
+          description: Player registration date (SoftSwiss time format)
+        country:
+          type: string
+          pattern: '^[A-Z]{2}$'
+          description: ISO 3166-1 alpha-2 country code
+        tags:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+          description: Player group tags (e.g. vip, high-roller)

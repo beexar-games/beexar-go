@@ -1,0 +1,23 @@
+{
+  "accounts": {
+    "player_1": {
+      "currency": "EUR",
+      "balance": "115.00"
+    }
+  },
+  "transactions": {
+    "tx-1": {
+      "id": "op-tx-1",
+      "balance_after": "90.00",
+      "type": "bet",
+      "amount": "10.00"
+    },
+    "tx-2": {
+      "id": "op-tx-2",
+      "balance_after": "115.00",
+      "type": "win",
+      "amount": "25.00"
+    }
+  },
+  "tombstones": []
+}

@@ -1,0 +1,11 @@
+{
+  "status": 400,
+  "body": {
+    "code": "invalid_argument",
+    "msg": "currency: must match ^[A-Z][A-Z0-9_]{2,31}$",
+    "meta": {
+      "api_code": "400",
+      "api_message": "currency: must match ^[A-Z][A-Z0-9_]{2,31}$"
+    }
+  }
+}

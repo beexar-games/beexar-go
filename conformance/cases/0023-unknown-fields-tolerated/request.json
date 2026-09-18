@@ -1,0 +1,7 @@
+{
+  "endpoint": "/balance",
+  "kind": "ledger",
+  "headers": {
+    "X-REQUEST-SIGN": "b06f1fb9f4e4226f1f2dbdcb6b538278a31206f89a7be134eced86bf1bc725f1"
+  }
+}

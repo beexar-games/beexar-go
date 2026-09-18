@@ -1,0 +1,13 @@
+{
+  "status": 200,
+  "body": {
+    "balance": "0.00",
+    "round_id": "op-round-1",
+    "transactions": [
+      {
+        "id_provider": "rb-1",
+        "id": "op-tx-2"
+      }
+    ]
+  }
+}

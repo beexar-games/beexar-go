@@ -1,0 +1,12 @@
+{
+  "status": 400,
+  "body": {
+    "code": "invalid_argument",
+    "msg": "bet limit reached",
+    "meta": {
+      "api_code": "105",
+      "api_message": "bet limit reached",
+      "balance": "77.00"
+    }
+  }
+}

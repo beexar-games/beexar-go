@@ -1,0 +1,19 @@
+{
+  "status": 200,
+  "body": {
+    "round_id": "op-round-1",
+    "transactions": [
+      {
+        "id_provider": "tx-1",
+        "id": "op-tx-1",
+        "bonus_amount": "0.00"
+      },
+      {
+        "id_provider": "tx-2",
+        "id": "op-tx-2",
+        "bonus_amount": "0.00"
+      }
+    ],
+    "balance": "115.00"
+  }
+}

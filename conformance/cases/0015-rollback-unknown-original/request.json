@@ -1,0 +1,7 @@
+{
+  "endpoint": "/rollback",
+  "kind": "ledger",
+  "headers": {
+    "X-REQUEST-SIGN": "d30820eae33649d393c9e3791ba68e02f22de93f1ca337f3f98991ba40a9e280"
+  }
+}

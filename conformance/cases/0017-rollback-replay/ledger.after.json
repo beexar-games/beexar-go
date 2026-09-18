@@ -1,0 +1,17 @@
+{
+  "accounts": {
+    "player_1": {
+      "currency": "EUR",
+      "balance": "42.00"
+    }
+  },
+  "transactions": {
+    "rb-1": {
+      "id": "op-tx-2",
+      "balance_after": "100.00"
+    }
+  },
+  "tombstones": [
+    "tx-1"
+  ]
+}

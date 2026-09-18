@@ -1,0 +1,7 @@
+{
+  "endpoint": "/balance",
+  "kind": "transport",
+  "headers": {
+    "X-REQUEST-SIGN": "a9f7a23e3d3ab65f9ca6ade7e764f1afa3c5cbeaafdf3d97cd0872ab3d070b96"
+  }
+}

@@ -1,0 +1,79 @@
+openapi: 3.0.3
+info:
+  title: Beexar Common Schemas
+  description: |
+    Shared OpenAPI schemas referenced by the base gateway spec and every
+    per-platform gateway spec (api/{platform}/gateway.yaml) via $ref. Keeping
+    the error envelope + shared types in one place avoids duplication and
+    keeps the wire contract identical across platforms.
+  version: v.2026.06.20
+
+# This file holds reusable components only; it declares no paths of its own.
+paths: {}
+
+components:
+  schemas:
+    # Machine-readable error code enum (SCREAMING_SNAKE). Stable contract:
+    # frontend/operators branch on `code`, never on `detail` text.
+    ProblemCode:
+      type: string
+      description: Machine-readable error code (stable contract)
+      enum:
+        # Generic
+        - INTERNAL_ERROR
+        - SERVICE_UNAVAILABLE
+        - VALIDATION_FAILED
+        - INVALID_ARGUMENT
+        - UNAUTHENTICATED
+        - PERMISSION_DENIED
+        - NOT_FOUND
+        # Launcher / session domain
+        - OPERATOR_SUSPENDED
+        - GAME_NOT_AVAILABLE
+        - GAME_NOT_FOUND
+        - CURRENCY_NOT_AVAILABLE
+        - FEATURE_SUBSCRIPTION_REQUIRED
+        # Multi-platform launch: operator called an endpoint that does not
+        # belong to its integration_type.
+        - INTEGRATION_TYPE_MISMATCH
+
+    # Unified error envelope (RFC 9457-like, Beexar-adapted). Same shape across
+    # all public Beexar services. Frontend reads `code`/`errors`, never parses
+    # `detail`. Correlation id is carried in X-Request-Id / X-Trace-Id response
+    # headers, not in the body.
+    Problem:
+      type: object
+      required:
+        - status
+        - code
+      properties:
+        status:
+          type: integer
+          description: HTTP status code (mirrors the response status)
+          example: 400
+        code:
+          $ref: '#/components/schemas/ProblemCode'
+          description: Stable machine-readable error code
+        detail:
+          type: string
+          description: Safe human-readable description (fallback only, no raw/internal details)
+        errors:
+          type: object
+          description: Optional field-level errors keyed by field. Present for validation failures.
+          additionalProperties:
+            $ref: '#/components/schemas/FieldError'
+
+    FieldError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          example: INVALID_TYPE
+          description: Machine-readable field error subcode
+        message:
+          type: string
+          example: Invalid value
+          description: Safe fallback message

@@ -1,0 +1,11 @@
+{
+  "status": 400,
+  "body": {
+    "code": "invalid_argument",
+    "msg": "action already rolled back",
+    "meta": {
+      "api_code": "409",
+      "api_message": "action already rolled back"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "endpoint": "/betwin",
+  "kind": "transport",
+  "headers": {
+    "X-REQUEST-SIGN": "71b940f5b618602559df43b13f4d7b9c9ab5c980b8a177fe1811020db8bc485a"
+  }
+}

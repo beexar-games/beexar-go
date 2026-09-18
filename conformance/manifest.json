@@ -1,0 +1,126 @@
+{
+  "fixture_version": 1,
+  "secret_file": "secret.txt",
+  "cases": [
+    {
+      "dir": "0001-balance-ok",
+      "endpoint": "/balance",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0002-signature-wrong",
+      "endpoint": "/balance",
+      "kind": "transport"
+    },
+    {
+      "dir": "0003-signature-absent",
+      "endpoint": "/balance",
+      "kind": "transport"
+    },
+    {
+      "dir": "0004-key-order-hostile",
+      "endpoint": "/betwin",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0005-unicode-escape",
+      "endpoint": "/balance",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0006-body-too-large",
+      "endpoint": "/betwin",
+      "kind": "transport"
+    },
+    {
+      "dir": "0007-amount-zero",
+      "endpoint": "/betwin",
+      "kind": "transport"
+    },
+    {
+      "dir": "0008-amount-scale-overflow",
+      "endpoint": "/betwin",
+      "kind": "transport"
+    },
+    {
+      "dir": "0009-amount-exponent-bomb",
+      "endpoint": "/betwin",
+      "kind": "transport"
+    },
+    {
+      "dir": "0010-currency-lowercase",
+      "endpoint": "/balance",
+      "kind": "transport"
+    },
+    {
+      "dir": "0011-betwin-bet-and-win",
+      "endpoint": "/betwin",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0012-insufficient-funds",
+      "endpoint": "/betwin",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0013-betwin-duplicate-replay",
+      "endpoint": "/betwin",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0014-batch-second-fails-atomic",
+      "endpoint": "/betwin",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0015-rollback-unknown-original",
+      "endpoint": "/rollback",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0016-betwin-after-tombstone",
+      "endpoint": "/betwin",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0017-rollback-replay",
+      "endpoint": "/rollback",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0018-rollback-applies",
+      "endpoint": "/rollback",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0019-rollback-win-clamps-at-zero",
+      "endpoint": "/rollback",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0020-finish-ok",
+      "endpoint": "/finish",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0021-finish-duplicate",
+      "endpoint": "/finish",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0022-handler-panics",
+      "endpoint": "/balance",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0023-unknown-fields-tolerated",
+      "endpoint": "/balance",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0024-bet-limit-carries-balance",
+      "endpoint": "/betwin",
+      "kind": "ledger"
+    }
+  ]
+}

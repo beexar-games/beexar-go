@@ -1,0 +1,11 @@
+{
+  "status": 400,
+  "body": {
+    "code": "invalid_argument",
+    "msg": "request body too large",
+    "meta": {
+      "api_code": "400",
+      "api_message": "request body too large"
+    }
+  }
+}

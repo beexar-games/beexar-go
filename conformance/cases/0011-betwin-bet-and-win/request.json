@@ -1,0 +1,7 @@
+{
+  "endpoint": "/betwin",
+  "kind": "ledger",
+  "headers": {
+    "X-REQUEST-SIGN": "db85a097e35da411f2c556edf016aa4378f8e2d3b70ca46c357714a85607a791"
+  }
+}

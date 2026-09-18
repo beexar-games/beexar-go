@@ -1,0 +1,10 @@
+{
+  "accounts": {
+    "player_1": {
+      "currency": "EUR",
+      "balance": "90.00"
+    }
+  },
+  "transactions": {},
+  "tombstones": []
+}

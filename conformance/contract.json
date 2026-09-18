@@ -1,0 +1,646 @@
+{
+  "contracts": {
+    "api/providers/softswiss/wallet.yaml": "v.2026.03.03",
+    "api/softswiss/gateway.yaml": "v.2026.06.20",
+    "api/gateway.yaml": "v.2026.06.09",
+    "api/common/schemas.yaml": "v.2026.06.20"
+  },
+  "schemas": {
+    "wallet": {
+      "ErrorResponseMeta": {
+        "required": [
+          "api_code",
+          "api_message"
+        ],
+        "properties": {
+          "api_code": {
+            "type": "string"
+          },
+          "api_message": {
+            "type": "string"
+          },
+          "balance": {
+            "type": "string"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "required": [
+          "code",
+          "meta"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "meta": {
+            "type": "ref",
+            "ref": "ErrorResponseMeta"
+          },
+          "msg": {
+            "type": "string"
+          }
+        }
+      },
+      "PlayerBalanceRequest": {
+        "required": [
+          "account_id",
+          "currency",
+          "game_id"
+        ],
+        "properties": {
+          "account_id": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]{2,31}$"
+          },
+          "game_id": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          }
+        }
+      },
+      "PlayerBalanceResponse": {
+        "required": [
+          "balance"
+        ],
+        "properties": {
+          "balance": {
+            "type": "string"
+          }
+        }
+      },
+      "RoundBetWinRequest": {
+        "required": [
+          "account_id",
+          "currency",
+          "game_id",
+          "round_id",
+          "transactions"
+        ],
+        "properties": {
+          "account_id": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]{2,31}$"
+          },
+          "finished": {
+            "type": "boolean"
+          },
+          "game_id": {
+            "type": "string"
+          },
+          "round_id": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "transactions": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "RoundBetWinRequestTransaction"
+            }
+          }
+        }
+      },
+      "RoundBetWinRequestTransaction": {
+        "required": [
+          "amount",
+          "id_provider",
+          "type"
+        ],
+        "properties": {
+          "amount": {
+            "type": "string"
+          },
+          "id_provider": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "bet",
+              "win"
+            ]
+          }
+        }
+      },
+      "RoundBetWinResponse": {
+        "required": [
+          "balance",
+          "round_id",
+          "transactions"
+        ],
+        "properties": {
+          "balance": {
+            "type": "string"
+          },
+          "round_id": {
+            "type": "string"
+          },
+          "transactions": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "RoundBetWinResponseTransaction"
+            }
+          }
+        }
+      },
+      "RoundBetWinResponseTransaction": {
+        "required": [
+          "bonus_amount",
+          "id",
+          "id_provider"
+        ],
+        "properties": {
+          "bonus_amount": {
+            "type": "string",
+            "pattern": "^\\d{1,18}(\\.\\d{1,12})?$"
+          },
+          "id": {
+            "type": "string"
+          },
+          "id_provider": {
+            "type": "string"
+          }
+        }
+      },
+      "RoundRollbackRequest": {
+        "required": [
+          "account_id",
+          "currency",
+          "finished",
+          "game_id",
+          "round_id_provider",
+          "transactions"
+        ],
+        "properties": {
+          "account_id": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]{2,31}$"
+          },
+          "finished": {
+            "type": "boolean"
+          },
+          "game_id": {
+            "type": "string"
+          },
+          "round_id_provider": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "transactions": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "RoundRollbackRequestTransaction"
+            }
+          }
+        }
+      },
+      "RoundRollbackRequestTransaction": {
+        "required": [
+          "id_provider",
+          "original_id_provider",
+          "type"
+        ],
+        "properties": {
+          "id_provider": {
+            "type": "string"
+          },
+          "original_id_provider": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "rollback"
+            ]
+          }
+        }
+      },
+      "RoundRollbackResponse": {
+        "required": [
+          "balance",
+          "round_id",
+          "transactions"
+        ],
+        "properties": {
+          "balance": {
+            "type": "string"
+          },
+          "round_id": {
+            "type": "string"
+          },
+          "transactions": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "RoundRollbackResponseTransaction"
+            }
+          }
+        }
+      },
+      "RoundRollbackResponseTransaction": {
+        "required": [
+          "id",
+          "id_provider"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "id_provider": {
+            "type": "string"
+          }
+        }
+      },
+      "RoundFinishRequest": {
+        "required": [
+          "account_id",
+          "currency",
+          "round_id"
+        ],
+        "properties": {
+          "account_id": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]{2,31}$"
+          },
+          "round_id": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          }
+        }
+      },
+      "RoundFinishResponse": {
+        "required": [
+          "balance"
+        ],
+        "properties": {
+          "balance": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "launcher": {
+      "LauncherRealRequest": {
+        "required": [
+          "account",
+          "casino_id",
+          "game"
+        ],
+        "properties": {
+          "account": {
+            "type": "ref",
+            "ref": "Account"
+          },
+          "casino_id": {
+            "type": "string"
+          },
+          "client_type": {
+            "type": "string",
+            "enum": [
+              "mobile",
+              "desktop"
+            ]
+          },
+          "game": {
+            "type": "string"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "jurisdiction": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}(-[A-Z]{2})?$"
+          },
+          "locale": {
+            "type": "string",
+            "pattern": "^[a-zA-Z]{2}$|^[a-zA-Z]{2}[-_][a-zA-Z]{2}$|^en-soc$"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "session_payload": {
+            "type": "string"
+          },
+          "urls": {
+            "type": "ref",
+            "ref": "LauncherURLs"
+          }
+        }
+      },
+      "LauncherDemoRequest": {
+        "required": [
+          "casino_id",
+          "game"
+        ],
+        "properties": {
+          "balance": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+)?$"
+          },
+          "casino_id": {
+            "type": "string"
+          },
+          "client_type": {
+            "type": "string",
+            "enum": [
+              "mobile",
+              "desktop"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]{2,31}$"
+          },
+          "game": {
+            "type": "string"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "jurisdiction": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}(-[A-Z]{2})?$"
+          },
+          "locale": {
+            "type": "string",
+            "pattern": "^[a-zA-Z]{2}$|^[a-zA-Z]{2}[-_][a-zA-Z]{2}$|^en-soc$"
+          },
+          "player_id": {
+            "type": "string"
+          },
+          "urls": {
+            "type": "object"
+          }
+        }
+      },
+      "LauncherResponse": {
+        "required": [
+          "launch_url"
+        ],
+        "properties": {
+          "launch_url": {
+            "type": "string"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "required": [
+          "code",
+          "meta"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "meta": {
+            "type": "ref",
+            "ref": "ErrorResponseMeta"
+          },
+          "msg": {
+            "type": "string"
+          }
+        }
+      },
+      "ErrorResponseMeta": {
+        "required": [
+          "api_code",
+          "api_message"
+        ],
+        "properties": {
+          "api_code": {
+            "type": "string"
+          },
+          "api_message": {
+            "type": "string"
+          }
+        }
+      },
+      "LauncherURLs": {
+        "required": [],
+        "properties": {
+          "deposit_url": {
+            "type": "string",
+            "pattern": "^(https?|app):\\/\\/([^\\/?#]+)([^?#]*)(\\?[^#]*)?(#.*)?$"
+          },
+          "return_url": {
+            "type": "string",
+            "pattern": "^(https?|app):\\/\\/([^\\/?#]+)([^?#]*)(\\?[^#]*)?(#.*)?$"
+          }
+        }
+      },
+      "Account": {
+        "required": [
+          "currency",
+          "id"
+        ],
+        "properties": {
+          "country": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]{2,31}$"
+          },
+          "date_of_birth": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$"
+          },
+          "email": {
+            "type": "string"
+          },
+          "firstname": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lastname": {
+            "type": "string"
+          },
+          "nickname": {
+            "type": "string"
+          },
+          "registered_at": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "catalog": {
+      "HealthResponse": {
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object"
+          }
+        }
+      },
+      "OperatorGamesResponse": {
+        "required": [
+          "games"
+        ],
+        "properties": {
+          "games": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "GameInfo"
+            }
+          }
+        }
+      },
+      "PreloaderBranding": {
+        "required": [
+          "vars"
+        ],
+        "properties": {
+          "logoUrl": {
+            "type": "string"
+          },
+          "vars": {
+            "type": "object"
+          }
+        }
+      },
+      "GameInfo": {
+        "required": [
+          "bonus_buy",
+          "category",
+          "currencies",
+          "demo_available",
+          "feature_group",
+          "has_freespins",
+          "identifier",
+          "payout",
+          "restrictions",
+          "thumbnail",
+          "title",
+          "volatility_rating"
+        ],
+        "properties": {
+          "bonus_buy": {
+            "type": "boolean"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "dice",
+              "plinko",
+              "slots",
+              "crash"
+            ]
+          },
+          "currencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "demo_available": {
+            "type": "boolean"
+          },
+          "feature_group": {
+            "type": "string"
+          },
+          "has_freespins": {
+            "type": "boolean"
+          },
+          "identifier": {
+            "type": "string"
+          },
+          "payout": {
+            "type": "number"
+          },
+          "restrictions": {
+            "type": "object"
+          },
+          "thumbnail": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "volatility_rating": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "very_high"
+            ]
+          }
+        }
+      }
+    },
+    "common": {
+      "Problem": {
+        "required": [
+          "code",
+          "status"
+        ],
+        "properties": {
+          "code": {
+            "type": "ref",
+            "ref": "ProblemCode"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "errors": {
+            "type": "object"
+          },
+          "status": {
+            "type": "integer"
+          }
+        }
+      },
+      "FieldError": {
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

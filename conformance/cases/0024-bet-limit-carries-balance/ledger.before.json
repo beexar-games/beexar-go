@@ -1,0 +1,11 @@
+{
+  "accounts": {
+    "limited": {
+      "currency": "EUR",
+      "balance": "77.00",
+      "bet_limited": true
+    }
+  },
+  "transactions": {},
+  "tombstones": []
+}
