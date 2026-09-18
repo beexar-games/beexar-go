@@ -4,6 +4,12 @@ All notable changes to `github.com/beexar-games/beexar-go`. The version is share
 for Node, PHP, Go and Python — the same number always means the same contract
 snapshot.
 
+## 1.0.2 — 2026-09-18
+
+No change to the code you consume. 1.0.1 reached PyPI, Packagist and the Go
+proxy but not npm: the publish workflow pinned `npm@latest`, which had moved to
+a major that refuses to run on the Node version the workflow used.
+
 ## 1.0.1 — 2026-09-18
 
 No change to the code you consume. The release exists to move publishing onto
