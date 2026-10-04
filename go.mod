@@ -1,6 +1,6 @@
 module github.com/beexar-games/beexar-go
 
-// Deliberately below the toolchain we build with. A `go` directive above what
-// an operator runs forces them to download a toolchain on every build, and this
-// package uses nothing newer.
-go 1.22
+// The oldest Go release upstream still supports (it keeps the last two), not
+// the toolchain we build with: a `go` directive above what an operator runs
+// forces them to download a toolchain on every build.
+go 1.26

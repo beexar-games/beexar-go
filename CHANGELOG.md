@@ -4,6 +4,11 @@ All notable changes to `github.com/beexar-games/beexar-go`. The version is share
 for Node, PHP, Go and Python — the same number always means the same contract
 snapshot.
 
+## 1.1.0 — 2026-10-04
+
+`go 1.26`, up from 1.22: Go supports its last two releases, 1.27 and 1.26. No
+change to the API.
+
 ## 1.0.2 — 2026-09-18
 
 No change to the code you consume. 1.0.1 reached PyPI, Packagist and the Go

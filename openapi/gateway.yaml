@@ -9,7 +9,7 @@ info:
 
     Shared error schemas are defined in api/common/schemas.yaml and referenced
     here and from every platform spec.
-  version: v.2026.06.09
+  version: v.2026.09.28
 
 servers:
   - url: https://gateway.beexar.com
@@ -188,6 +188,38 @@ components:
             Omitted when the game ships no logo and none is configured.
           example: brand/splash.png
 
+    GameImage:
+      type: object
+      required:
+        - type
+        - width
+        - height
+        - url
+      properties:
+        type:
+          type: string
+          description: Image format
+          enum: [square_640, portrait_3x4, landscape_16x9, social_1200x630]
+          example: portrait_3x4
+        width:
+          type: integer
+          description: Width in pixels
+          example: 600
+        height:
+          type: integer
+          description: Height in pixels
+          example: 800
+        url:
+          type: string
+          format: uri
+          description: PNG image URL
+          example: https://cdn.beexar.com/operators/2f6c/games/9a1e/catalog/5d3b.png
+        webp_url:
+          type: string
+          format: uri
+          description: The same image as WebP, when available
+          example: https://cdn.beexar.com/operators/2f6c/games/9a1e/catalog/5d3b.webp
+
     GameInfo:
       type: object
       required:
@@ -201,6 +233,7 @@ components:
         - bonus_buy
         - demo_available
         - thumbnail
+        - images
         - currencies
         - restrictions
       properties:
@@ -214,8 +247,8 @@ components:
           example: slot
         category:
           type: string
-          description: Game type
-          enum: [dice, plinko, slots, crash]
+          description: Game type (rgs = an RGS game, e.g. Candy Crash)
+          enum: [dice, plinko, slots, crash, rgs]
           example: slots
         feature_group:
           type: string
@@ -250,6 +283,18 @@ components:
             image (the same 640×640 default for every game type), so the field is
             always a usable URL.
           example: https://cdn.beexar.com/defaults/catalog/default-640x640.png
+        images:
+          type: array
+          description: >-
+            Every catalog image the game has, one per format, for operators
+            that place the game in several lobby layouts: `square_640`
+            (640×640 tile), `portrait_3x4` (600×800 tile), `landscape_16x9`
+            (1280×720 tile or banner) and `social_1200x630` (1200×630
+            link-preview card). The square comes first when present. Empty
+            when the game has none — `thumbnail` then carries the platform
+            default. Each image is a PNG, with a WebP copy when available.
+          items:
+            $ref: '#/components/schemas/GameImage'
         currencies:
           type: array
           items:

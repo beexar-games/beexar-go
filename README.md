@@ -4,7 +4,7 @@ Beexar operator SDK for Go. Launch game sessions, and serve the four
 seamless-wallet callbacks the platform calls during play.
 
 **Zero dependencies** — standard library only, in the SDK and in its tests.
-Go 1.22+.
+Go 1.26+.
 
 ```bash
 go get github.com/beexar-games/beexar-go

@@ -2,7 +2,7 @@
   "contracts": {
     "api/providers/softswiss/wallet.yaml": "v.2026.03.03",
     "api/softswiss/gateway.yaml": "v.2026.06.20",
-    "api/gateway.yaml": "v.2026.06.09",
+    "api/gateway.yaml": "v.2026.09.28",
     "api/common/schemas.yaml": "v.2026.06.20"
   },
   "schemas": {
@@ -535,6 +535,37 @@
           }
         }
       },
+      "GameImage": {
+        "required": [
+          "height",
+          "type",
+          "url",
+          "width"
+        ],
+        "properties": {
+          "height": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "square_640",
+              "portrait_3x4",
+              "landscape_16x9",
+              "social_1200x630"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "webp_url": {
+            "type": "string"
+          },
+          "width": {
+            "type": "integer"
+          }
+        }
+      },
       "GameInfo": {
         "required": [
           "bonus_buy",
@@ -544,6 +575,7 @@
           "feature_group",
           "has_freespins",
           "identifier",
+          "images",
           "payout",
           "restrictions",
           "thumbnail",
@@ -560,7 +592,8 @@
               "dice",
               "plinko",
               "slots",
-              "crash"
+              "crash",
+              "rgs"
             ]
           },
           "currencies": {
@@ -580,6 +613,13 @@
           },
           "identifier": {
             "type": "string"
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "GameImage"
+            }
           },
           "payout": {
             "type": "number"

@@ -235,6 +235,22 @@ type GameInfo struct {
 	Currencies       []string `json:"currencies,omitempty"`
 	// Restrictions carries the country blacklist that applies to this game.
 	Restrictions *GameRestrictions `json:"restrictions,omitempty"`
+	// Images are every catalog image the game has, one per format, the
+	// square tile first: square_640 (640×640), portrait_3x4 (600×800),
+	// landscape_16x9 (1280×720), social_1200x630 (1200×630 link-preview
+	// card). Empty when the game has none — Thumbnail then carries the
+	// platform default.
+	Images []GameImage `json:"images,omitempty"`
+}
+
+// GameImage is one catalog image of a game: a PNG, with a WebP copy when
+// available.
+type GameImage struct {
+	Type    string `json:"type,omitempty"`
+	Width   int    `json:"width,omitempty"`
+	Height  int    `json:"height,omitempty"`
+	URL     string `json:"url,omitempty"`
+	WebPURL string `json:"webp_url,omitempty"`
 }
 
 // GameRestrictions groups the per-game availability rules.
