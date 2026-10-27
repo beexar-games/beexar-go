@@ -78,6 +78,48 @@ func TestSignatureFailureIs400WithAPICode403(t *testing.T) {
 	}
 }
 
+func TestVerifyRefusesMalformedSignatures(t *testing.T) {
+	// Parity with the Node and Python SDKs: a header that is not 64 lowercase
+	// hex characters is answered false, never with a panic or an error. The
+	// non-ASCII rows are the shape that crashed the other two.
+	body := []byte(`{}`)
+	cases := []struct {
+		name      string
+		signature string
+	}{
+		{"64 non-ASCII chars", strings.Repeat("é", 64)},
+		{"63 non-ASCII chars", strings.Repeat("é", 63)},
+		{"empty", ""},
+		{"wrong length", "deadbeef"},
+		{"wrong value", strings.Repeat("0", 64)},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if beexar.Verify(body, c.signature, testSecret) {
+				t.Errorf("Verify(%q) = true, want false", c.signature)
+			}
+		})
+	}
+	if !beexar.Verify(body, beexar.Sign(body, testSecret), testSecret) {
+		t.Error("Verify rejects the signature Sign produced for the same bytes")
+	}
+}
+
+func TestNonASCIISignatureIs400WithAPICode403(t *testing.T) {
+	s := newServer(t, beexar.WithWarning(func(string) {}))
+	out := s.Dispatch(context.Background(), beexar.RouteBalance, []byte(`{}`), strings.Repeat("é", 64), nil)
+	if out.Status != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400 — a malformed header is a signature refusal, not a 500", out.Status)
+	}
+	var env beexar.ErrorEnvelope
+	if err := json.Unmarshal(out.Body, &env); err != nil {
+		t.Fatalf("body is not the error envelope: %v (%s)", err, out.Body)
+	}
+	if env.Meta.APICode != beexar.APICodeForbidden {
+		t.Errorf("api_code = %q, want 403", env.Meta.APICode)
+	}
+}
+
 func TestSignatureDiagnosticNamesTheReserialisation(t *testing.T) {
 	var warnings []string
 	s := newServer(t, beexar.WithWarning(func(m string) { warnings = append(warnings, m) }))
@@ -232,5 +274,157 @@ func TestHTTPHandlerRefusesAnOversizeBody(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("status = %d, want 400", resp.StatusCode)
+	}
+}
+
+// freespinsWallet is stubWallet plus the optional fifth method.
+type freespinsWallet struct {
+	stubWallet
+	seen *beexar.FreespinsFinishRequest
+}
+
+func (f *freespinsWallet) FreespinsFinish(_ context.Context, req beexar.FreespinsFinishRequest, _ beexar.RequestContext) (beexar.FreespinsFinishResult, error) {
+	f.seen = &req
+	return beexar.FreespinsFinishResult{Balance: beexar.MustParseMoney("112.50")}, nil
+}
+
+const freespinsFinishBody = `{"issue_id":"fs-1","amount":"12.50"}`
+
+func dispatchSigned(s *beexar.WalletServer, route beexar.Route, body string) beexar.DispatchResponse {
+	return s.Dispatch(context.Background(), route, []byte(body), beexar.Sign([]byte(body), testSecret), nil)
+}
+
+func TestFreespinsFinishReachesTheOptionalHandler(t *testing.T) {
+	wallet := &freespinsWallet{}
+	s, err := beexar.NewWalletServer(wallet, testSecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out := dispatchSigned(s, beexar.RouteFreespinsFinish, freespinsFinishBody)
+	if out.Status != http.StatusOK || string(out.Body) != `{"balance":"112.50"}` {
+		t.Fatalf("got %d %s, want 200 {\"balance\":\"112.50\"}", out.Status, out.Body)
+	}
+	if wallet.seen == nil || wallet.seen.IssueID != "fs-1" || wallet.seen.Amount.String() != "12.50" {
+		t.Errorf("handler saw %+v", wallet.seen)
+	}
+
+	// Zero is a result here, not a bad request: the freespins won nothing.
+	out = dispatchSigned(s, beexar.RouteFreespinsFinish, `{"issue_id":"fs-1","amount":"0"}`)
+	if out.Status != http.StatusOK || !wallet.seen.Amount.IsZero() {
+		t.Errorf("zero amount: status %d, handler saw %+v", out.Status, wallet.seen)
+	}
+}
+
+func TestFreespinsFinishIsValidatedBeforeTheHandler(t *testing.T) {
+	cases := []struct {
+		name, body, want string
+	}{
+		{"negative amount", `{"issue_id":"fs-1","amount":"-1.00"}`, "amount: not a valid decimal amount"},
+		{"no amount", `{"issue_id":"fs-1"}`, "amount: not a valid decimal amount"},
+		{"no issue_id", `{"amount":"12.50"}`, "issue_id: required, must be a non-empty string"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			wallet := &freespinsWallet{}
+			s, err := beexar.NewWalletServer(wallet, testSecret)
+			if err != nil {
+				t.Fatal(err)
+			}
+			out := dispatchSigned(s, beexar.RouteFreespinsFinish, c.body)
+			var env beexar.ErrorEnvelope
+			_ = json.Unmarshal(out.Body, &env)
+			if out.Status != http.StatusBadRequest || env.Msg != c.want {
+				t.Errorf("got %d %q, want 400 %q", out.Status, env.Msg, c.want)
+			}
+			if wallet.seen != nil {
+				t.Error("the handler ran on an invalid request")
+			}
+		})
+	}
+}
+
+func TestFreespinsFinishWithoutTheHandlerAnswersLikeAnUnknownRoute(t *testing.T) {
+	// stubWallet has the four methods only — a wallet written before freespins
+	// existed, or one that does not offer them. It must keep compiling and
+	// serving, and answer /freespins/finish the way an unknown route is.
+	s := newServer(t)
+
+	out := dispatchSigned(s, beexar.RouteFreespinsFinish, freespinsFinishBody)
+	var env beexar.ErrorEnvelope
+	if err := json.Unmarshal(out.Body, &env); err != nil {
+		t.Fatal(err)
+	}
+	if out.Status != http.StatusBadRequest || env.Meta.APICode != beexar.APICodeNotFound ||
+		env.Msg != "freespins finish is not implemented by this wallet" {
+		t.Errorf("got %d %+v", out.Status, env)
+	}
+	if out := dispatchSigned(s, beexar.RouteBalance, `{"account_id":"p","currency":"EUR","game_id":"d"}`); out.Status != http.StatusOK {
+		t.Errorf("/balance stopped working: %d", out.Status)
+	}
+}
+
+func TestFreespinsRefusalsCarryTheirAPICodes(t *testing.T) {
+	if got := beexar.ErrInvalidFreespinsIssue("").Envelope().Meta.APICode; got != "610" {
+		t.Errorf("ErrInvalidFreespinsIssue api_code = %s, want 610", got)
+	}
+	if got := beexar.ErrFreespinsStateTransition("").Envelope().Meta.APICode; got != "605" {
+		t.Errorf("ErrFreespinsStateTransition api_code = %s, want 605", got)
+	}
+}
+
+func TestRouteFromPathPrefersTheLongestRoute(t *testing.T) {
+	// /freespins/finish ends with /finish too. Matching the shorter route first
+	// would hand a freespins result to the round's finish handler.
+	cases := map[string]beexar.Route{
+		"/freespins/finish":         beexar.RouteFreespinsFinish,
+		"/x/freespins/finish":       beexar.RouteFreespinsFinish,
+		"/wallet/freespins/finish/": beexar.RouteFreespinsFinish,
+		"/finish":                   beexar.RouteFinish,
+		"/x/finish":                 beexar.RouteFinish,
+		"/wallet/betwin":            beexar.RouteBetWin,
+	}
+	for path, want := range cases {
+		if got, ok := beexar.RouteFromPath(path); !ok || got != want {
+			t.Errorf("RouteFromPath(%q) = %q, %v; want %q", path, got, ok, want)
+		}
+	}
+	for _, path := range []string{"/health", "/freespins"} {
+		if got, ok := beexar.RouteFromPath(path); ok {
+			t.Errorf("RouteFromPath(%q) = %q, want no route", path, got)
+		}
+	}
+}
+
+func TestHTTPHandlerTellsTheFreespinsResultFromTheRoundFinish(t *testing.T) {
+	s, err := beexar.NewWalletServer(&freespinsWallet{}, testSecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(s.NewHandler())
+	defer srv.Close()
+
+	roundFinish := `{"account_id":"player_1","currency":"EUR","round_id":"r-1"}`
+	for path, c := range map[string]struct{ body, balance string }{
+		"/wallet/freespins/finish": {freespinsFinishBody, "112.50"},
+		"/wallet/finish":           {roundFinish, "100.00"},
+	} {
+		req, err := http.NewRequest(http.MethodPost, srv.URL+path, strings.NewReader(c.body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set(beexar.SignatureHeader, beexar.Sign([]byte(c.body), testSecret))
+		resp, err := srv.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got struct {
+			Balance string `json:"balance"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&got)
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusOK || got.Balance != c.balance {
+			t.Errorf("%s: status %d balance %q, want 200 %q", path, resp.StatusCode, got.Balance, c.balance)
+		}
 	}
 }

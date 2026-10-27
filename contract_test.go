@@ -93,6 +93,58 @@ func TestWireStructsCoverTheSpec(t *testing.T) {
 	}
 }
 
+// TestFreespinsTypesMatchTheSpec holds the freespins request and answer types
+// to their schemas in both directions: every property the spec declares is
+// carried, and nothing the spec does not declare is invented. casino_id is
+// the one deliberate gap — the client adds it from NewClient, so a caller
+// never passes it.
+func TestFreespinsTypesMatchTheSpec(t *testing.T) {
+	doc := loadContract(t)
+
+	cases := []struct {
+		schema    string
+		value     any
+		clientSet []string
+	}{
+		{"FreespinsIssueRequest", beexar.FreespinsIssueRequest{}, []string{"casino_id"}},
+		{"FreespinsCancelRequest", beexar.FreespinsCancelRequest{}, []string{"casino_id"}},
+		{"BetLevelsRequest", beexar.BetLevelsRequest{}, []string{"casino_id"}},
+		{"BetLevelData", beexar.BetLevelData{}, nil},
+		{"CurrencyBetLevels", beexar.CurrencyBetLevels{}, nil},
+		{"BetLevel", beexar.BetLevel{}, nil},
+	}
+
+	for _, c := range cases {
+		t.Run(c.schema, func(t *testing.T) {
+			spec, ok := doc.Schemas["launcher"][c.schema]
+			if !ok {
+				t.Fatalf("schema %s is not in contract.json under \"launcher\" — did the spec rename it?", c.schema)
+			}
+			have := jsonFields(c.value)
+			for _, f := range c.clientSet {
+				have[f] = true
+			}
+			for property := range spec.Properties {
+				if !have[property] {
+					t.Errorf("%s.%s is in the spec but not on %T", c.schema, property, c.value)
+				}
+			}
+			for field := range have {
+				if _, ok := spec.Properties[field]; !ok {
+					t.Errorf("%T carries %s, which %s does not declare", c.value, field, c.schema)
+				}
+			}
+		})
+	}
+
+	// BetLevels unwraps the answer to its one field; that field must stay the
+	// whole answer.
+	answer := doc.Schemas["launcher"]["BetLevelsResponse"]
+	if len(answer.Properties) != 1 || answer.Properties["bet_levels"].Type != "array" {
+		t.Errorf("BetLevelsResponse is no longer just bet_levels: %+v", answer.Properties)
+	}
+}
+
 func TestContractVersionsAreRecorded(t *testing.T) {
 	doc := loadContract(t)
 	for _, path := range []string{

@@ -4,6 +4,43 @@ All notable changes to `github.com/beexar-games/beexar-go`. The version is share
 for Node, PHP, Go and Python — the same number always means the same contract
 snapshot.
 
+## 1.2.0 — 2026-10-23
+
+Operator freespins, the SoftSwiss Freespins API one to one. Additions only: a
+`WalletHandler` that does not issue freespins compiles and runs unchanged.
+
+- `Client.IssueFreespins`, `Client.CancelFreespins` and `Client.BetLevels` —
+  Freespins/Issue, Freespins/Cancel and Bet/Levels, signed over the exact bytes
+  like the launch calls. Their types: `FreespinsIssueRequest`,
+  `FreespinsCancelRequest`, `BetLevelsRequest`, `BetLevelData`,
+  `CurrencyBetLevels`, `BetLevel`.
+- `/freespins/finish`, the fifth callback: implement the optional
+  `FreespinsFinishHandler` on your handler to receive a `FreespinsFinishRequest`
+  (`Amount` as `Money`, zero allowed). Without it the route answers like an
+  unknown one.
+- `ErrInvalidFreespinsIssue` (api_code 610) and `ErrFreespinsStateTransition`
+  (605); the `APICodeFreespins*` constants.
+- `APICodeFeatureNotSupported` (608): `IssueFreespins` answers it for a game
+  that plays no freespins, and `APICodeGameNotAvailable` (405) for a game your
+  casino does not have; 601 is left for a missing bet level. 406 reads "This
+  feature is not enabled for your casino" (the SoftSwiss registry of
+  2026-10-25).
+- `RouteFreespinsFinish`, also in `Routes`.
+- `RouteFromPath` matches the longest route first. `/freespins/finish` ends with
+  `/finish` too, and must not reach the round's finish handler.
+- The `casino_id` merge keeps request numbers exact instead of passing them
+  through a `float64`.
+- The reference wallet credits a freespins result once per issue id, and the
+  conformance fixtures (version 2) cover it.
+- Conformance fixtures version 3 add `0033-signature-non-ascii`: a malformed
+  `X-REQUEST-SIGN` of the right length but not hex is refused like any bad
+  signature (HTTP 400, api_code 403). `Verify` already did; the case and
+  `TestVerifyRefusesMalformedSignatures` pin it.
+- The game catalog no longer lists the built-in slots game, removed on
+  2026-10-24: `Category` is `dice`, `plinko`, `crash` or `rgs`. `HasFreespins`
+  reports a game's own in-game free spins, not operator freespins; no game
+  sets it today.
+
 ## 1.1.0 — 2026-10-04
 
 `go 1.26`, up from 1.22: Go supports its last two releases, 1.27 and 1.26. No

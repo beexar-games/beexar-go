@@ -1,5 +1,5 @@
 {
-  "fixture_version": 1,
+  "fixture_version": 3,
   "secret_file": "secret.txt",
   "cases": [
     {
@@ -121,6 +121,51 @@
       "dir": "0024-bet-limit-carries-balance",
       "endpoint": "/betwin",
       "kind": "ledger"
+    },
+    {
+      "dir": "0025-freespins-finish-ok",
+      "endpoint": "/freespins/finish",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0026-freespins-finish-duplicate-replay",
+      "endpoint": "/freespins/finish",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0027-freespins-finish-zero-amount",
+      "endpoint": "/freespins/finish",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0028-freespins-finish-unknown-issue",
+      "endpoint": "/freespins/finish",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0029-freespins-finish-canceled-issue",
+      "endpoint": "/freespins/finish",
+      "kind": "ledger"
+    },
+    {
+      "dir": "0030-freespins-finish-signature-wrong",
+      "endpoint": "/freespins/finish",
+      "kind": "transport"
+    },
+    {
+      "dir": "0031-freespins-finish-amount-malformed",
+      "endpoint": "/freespins/finish",
+      "kind": "transport"
+    },
+    {
+      "dir": "0032-freespins-finish-amount-scale-overflow",
+      "endpoint": "/freespins/finish",
+      "kind": "transport"
+    },
+    {
+      "dir": "0033-signature-non-ascii",
+      "endpoint": "/balance",
+      "kind": "transport"
     }
   ]
 }

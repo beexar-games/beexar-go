@@ -1,0 +1,7 @@
+{
+  "endpoint": "/freespins/finish",
+  "kind": "transport",
+  "headers": {
+    "X-REQUEST-SIGN": "db123b8ef642fab8c2cc95c346659fddc2c05b70d55e2d6a75d5da53bef43251"
+  }
+}

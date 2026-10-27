@@ -9,7 +9,7 @@ info:
 
     Shared error schemas are defined in api/common/schemas.yaml and referenced
     here and from every platform spec.
-  version: v.2026.09.28
+  version: v.2026.10.24
 
 servers:
   - url: https://gateway.beexar.com
@@ -180,6 +180,12 @@ components:
           example:
             "--color-preloader-bg": "#101010"
             "--color-preloader-spinner": "#ff8800"
+        background:
+          type: string
+        decoration:
+          type: string
+        colorScheme:
+          type: string
         logoUrl:
           type: string
           description: |
@@ -240,16 +246,16 @@ components:
         title:
           type: string
           description: Game display name
-          example: Lucky Slots
+          example: Lucky Dice
         identifier:
           type: string
           description: Game slug (unique identifier)
-          example: slot
+          example: dice
         category:
           type: string
-          description: Game type (rgs = an RGS game, e.g. Candy Crash)
-          enum: [dice, plinko, slots, crash, rgs]
-          example: slots
+          description: Game type (rgs = a game served by the RGS engine)
+          enum: [dice, plinko, crash, rgs]
+          example: dice
         feature_group:
           type: string
           description: Operator slug
@@ -266,7 +272,9 @@ components:
           example: high
         has_freespins:
           type: boolean
-          description: Whether the game supports free spins
+          description: >
+            Whether the game has its own in-game free spins (a game feature,
+            not the operator Freespins API)
         bonus_buy:
           type: boolean
           description: Whether the game supports bonus buy

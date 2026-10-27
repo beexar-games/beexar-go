@@ -4,7 +4,8 @@
 //
 // Point the four callback URLs in the backoffice at
 // http://<host>/wallet/{balance,betwin,rollback,finish} and run the Integration
-// Test Game against it.
+// Test Game against it. If you issue freespins, point the freespins finish URL
+// at http://<host>/wallet/freespins/finish as well.
 package main
 
 import (
@@ -44,7 +45,7 @@ func main() {
 	mux.Handle("/wallet/", server.NewHandler())
 
 	log.Printf("beexar wallet listening on %s", addr)
-	log.Printf("  POST /wallet/balance  /wallet/betwin  /wallet/rollback  /wallet/finish")
+	log.Printf("  POST /wallet/balance  /wallet/betwin  /wallet/rollback  /wallet/finish  /wallet/freespins/finish")
 	// ReadHeaderTimeout keeps a slow-header client from holding a connection open.
 	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 10_000_000_000}
 	log.Fatal(srv.ListenAndServe())

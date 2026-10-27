@@ -1,0 +1,7 @@
+{
+  "endpoint": "/freespins/finish",
+  "kind": "ledger",
+  "headers": {
+    "X-REQUEST-SIGN": "748935ccc5223f1de35eab8a27ba485a3725a85f199d0659e0544cfba2f5706e"
+  }
+}

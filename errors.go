@@ -42,6 +42,21 @@ const (
 	APICodeRequestTimeout     = "504"
 )
 
+// Freespins. Beexar answers your IssueFreespins / CancelFreespins with 405,
+// 406 and the 6xx codes; your /freespins/finish answers 610 for an issue you
+// never issued and 605 for one you canceled.
+const (
+	APICodeFreespinsNotAvailable    = "406" // This feature is not enabled for your casino.
+	APICodeFreespinsImpossible      = "601" // Impossible to issue freespins in requested game.
+	APICodeFreespinsNoGame          = "602" // You shall provide at least one game to issue freespins.
+	APICodeFreespinsBadExpiration   = "603" // Bad expiration date.
+	APICodeFreespinsStateTransition = "605" // Can't change issue state from its current to requested.
+	APICodeFeatureNotSupported      = "608" // Feature is not supported for the requested game.
+	APICodeFreespinsInvalidIssue    = "610" // Invalid freespins issue.
+	APICodeFreespinsExpired         = "611" // Freespins issue has already expired.
+	APICodeFreespinsCantCancel      = "620" // Freespins issue can't be canceled.
+)
+
 // Twirp codes. Only these two exist on this contract.
 const (
 	TwirpCodeInvalidArgument = "invalid_argument"
@@ -189,6 +204,21 @@ func ErrAlreadyRolledBack() *WalletError {
 	return clientError(APICodeAlreadyRolledBack, "action already rolled back", nil)
 }
 
+// --- freespins ------------------------------------------------------------
+
+// ErrInvalidFreespinsIssue builds api_code 610 — /freespins/finish names an
+// issue_id you never issued.
+func ErrInvalidFreespinsIssue(message string) *WalletError {
+	return clientError(APICodeFreespinsInvalidIssue, orDefault(message, "invalid freespins issue"), nil)
+}
+
+// ErrFreespinsStateTransition builds api_code 605 — the issue cannot take this
+// result in its current state: on /freespins/finish, an issue you canceled.
+func ErrFreespinsStateTransition(message string) *WalletError {
+	return clientError(APICodeFreespinsStateTransition,
+		orDefault(message, "can't change issue state from its current to requested"), nil)
+}
+
 // --- server ---------------------------------------------------------------
 
 // ErrInternal builds api_code 500.
@@ -225,7 +255,8 @@ func orDefault(s, fallback string) string {
 }
 
 // APIError is an error answer from the Beexar gateway to one of YOUR calls
-// (LaunchReal, LaunchDemo, ListGames).
+// (LaunchReal, LaunchDemo, ListGames, IssueFreespins, CancelFreespins,
+// BetLevels).
 type APIError struct {
 	HTTPStatus int
 	Code       string

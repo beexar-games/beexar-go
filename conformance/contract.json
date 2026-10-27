@@ -1,8 +1,8 @@
 {
   "contracts": {
-    "api/providers/softswiss/wallet.yaml": "v.2026.03.03",
-    "api/softswiss/gateway.yaml": "v.2026.06.20",
-    "api/gateway.yaml": "v.2026.09.28",
+    "api/providers/softswiss/wallet.yaml": "v.2026.10.25",
+    "api/softswiss/gateway.yaml": "v.2026.10.26",
+    "api/gateway.yaml": "v.2026.10.24",
     "api/common/schemas.yaml": "v.2026.06.20"
   },
   "schemas": {
@@ -300,6 +300,31 @@
             "type": "string"
           }
         }
+      },
+      "FreespinsFinishRequest": {
+        "required": [
+          "amount",
+          "issue_id"
+        ],
+        "properties": {
+          "amount": {
+            "type": "string",
+            "pattern": "^\\d{1,18}(\\.\\d{1,18})?$"
+          },
+          "issue_id": {
+            "type": "string"
+          }
+        }
+      },
+      "FreespinsFinishResponse": {
+        "required": [
+          "balance"
+        ],
+        "properties": {
+          "balance": {
+            "type": "string"
+          }
+        }
       }
     },
     "launcher": {
@@ -396,6 +421,158 @@
           }
         }
       },
+      "FreespinsIssueRequest": {
+        "required": [
+          "account",
+          "bet_level",
+          "casino_id",
+          "freespins_quantity",
+          "games",
+          "issue_id",
+          "valid_until"
+        ],
+        "properties": {
+          "account": {
+            "type": "ref",
+            "ref": "Account"
+          },
+          "bet_level": {
+            "type": "integer"
+          },
+          "casino_id": {
+            "type": "string"
+          },
+          "freespins_quantity": {
+            "type": "integer"
+          },
+          "games": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "issue_id": {
+            "type": "string"
+          },
+          "valid_until": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$"
+          }
+        }
+      },
+      "FreespinsIssueResponse": {
+        "required": [],
+        "properties": {}
+      },
+      "FreespinsCancelRequest": {
+        "required": [
+          "casino_id",
+          "issue_id"
+        ],
+        "properties": {
+          "casino_id": {
+            "type": "string"
+          },
+          "issue_id": {
+            "type": "string"
+          }
+        }
+      },
+      "FreespinsCancelResponse": {
+        "required": [],
+        "properties": {}
+      },
+      "BetLevelsRequest": {
+        "required": [
+          "casino_id"
+        ],
+        "properties": {
+          "casino_id": {
+            "type": "string"
+          },
+          "currencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "games": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "BetLevelsResponse": {
+        "required": [
+          "bet_levels"
+        ],
+        "properties": {
+          "bet_levels": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "BetLevelData"
+            }
+          }
+        }
+      },
+      "BetLevelData": {
+        "required": [
+          "currencies",
+          "games"
+        ],
+        "properties": {
+          "currencies": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "CurrencyBetLevels"
+            }
+          },
+          "games": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CurrencyBetLevels": {
+        "required": [
+          "bet_levels",
+          "currency"
+        ],
+        "properties": {
+          "bet_levels": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "BetLevel"
+            }
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z0-9]{3,4}$"
+          }
+        }
+      },
+      "BetLevel": {
+        "required": [
+          "amount",
+          "bet_level"
+        ],
+        "properties": {
+          "amount": {
+            "type": "string",
+            "pattern": "^\\d{1,18}(\\.\\d{1,12})?$"
+          },
+          "bet_level": {
+            "type": "integer"
+          }
+        }
+      },
       "LauncherResponse": {
         "required": [
           "launch_url"
@@ -443,11 +620,11 @@
         "properties": {
           "deposit_url": {
             "type": "string",
-            "pattern": "^(https?|app):\\/\\/([^\\/?#]+)([^?#]*)(\\?[^#]*)?(#.*)?$"
+            "pattern": "^([A-Za-z0-9_]+):\\/\\/([^\\/?#]+)([^?#]*)(\\?[^#]*)?(#.*)?$"
           },
           "return_url": {
             "type": "string",
-            "pattern": "^(https?|app):\\/\\/([^\\/?#]+)([^?#]*)(\\?[^#]*)?(#.*)?$"
+            "pattern": "^([A-Za-z0-9_]+):\\/\\/([^\\/?#]+)([^?#]*)(\\?[^#]*)?(#.*)?$"
           }
         }
       },
@@ -527,6 +704,15 @@
           "vars"
         ],
         "properties": {
+          "background": {
+            "type": "string"
+          },
+          "colorScheme": {
+            "type": "string"
+          },
+          "decoration": {
+            "type": "string"
+          },
           "logoUrl": {
             "type": "string"
           },
@@ -591,7 +777,6 @@
             "enum": [
               "dice",
               "plinko",
-              "slots",
               "crash",
               "rgs"
             ]

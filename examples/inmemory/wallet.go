@@ -14,6 +14,10 @@
 //     none does, and an insufficient-funds answer reports the balance as it was
 //     BEFORE the batch — because nothing moved.
 //
+// Freespins follow the same discipline with issue_id as the key: record the
+// issue before you send Freespins/Issue, credit its /freespins/finish once,
+// and answer a repeat with the balance you stored the first time.
+//
 // The single mutex below stands in for your BEGIN/COMMIT. In a real wallet the
 // dedupe read, the tombstone read and the balance update must all be in one
 // database transaction. That is why the SDK does not offer to do idempotency
@@ -49,11 +53,35 @@ type StoredAccount struct {
 	BetLimited bool `json:"bet_limited,omitempty"`
 }
 
+// FreespinsIssueStatus is where a freespins issue stands on your side.
+type FreespinsIssueStatus string
+
+// The three states of an issue on the operator's side.
+const (
+	FreespinsIssued   FreespinsIssueStatus = "issued"
+	FreespinsCanceled FreespinsIssueStatus = "canceled"
+	FreespinsFinished FreespinsIssueStatus = "finished"
+)
+
+// StoredFreespinsIssue is one row of the freespins issues table.
+type StoredFreespinsIssue struct {
+	// AccountID and Currency say whose freespins these are —
+	// /freespins/finish does not.
+	AccountID string               `json:"account_id"`
+	Currency  string               `json:"currency"`
+	Status    FreespinsIssueStatus `json:"status"`
+	// Amount is recorded when /freespins/finish credits the issue.
+	Amount string `json:"amount,omitempty"`
+	// BalanceAfter is the balance answered then; a repeat answers it again.
+	BalanceAfter string `json:"balance_after,omitempty"`
+}
+
 // LedgerState is the whole wallet, in the shape the conformance fixtures use.
 type LedgerState struct {
-	Accounts     map[string]StoredAccount     `json:"accounts"`
-	Transactions map[string]StoredTransaction `json:"transactions"`
-	Tombstones   []string                     `json:"tombstones"`
+	Accounts        map[string]StoredAccount        `json:"accounts"`
+	Transactions    map[string]StoredTransaction    `json:"transactions"`
+	Tombstones      []string                        `json:"tombstones"`
+	FreespinsIssues map[string]StoredFreespinsIssue `json:"freespins_issues"`
 }
 
 type account struct {
@@ -62,15 +90,17 @@ type account struct {
 	betLimited bool
 }
 
-// Wallet implements beexar.WalletHandler over the maps above.
+// Wallet implements beexar.WalletHandler and beexar.FreespinsFinishHandler
+// over the maps above.
 type Wallet struct {
-	mu           sync.Mutex
-	accounts     map[string]*account
-	transactions map[string]StoredTransaction
-	tombstones   map[string]bool
-	rounds       map[string]string
-	nextTx       int
-	nextRound    int
+	mu              sync.Mutex
+	accounts        map[string]*account
+	transactions    map[string]StoredTransaction
+	tombstones      map[string]bool
+	freespinsIssues map[string]StoredFreespinsIssue
+	rounds          map[string]string
+	nextTx          int
+	nextRound       int
 }
 
 var opTxID = regexp.MustCompile(`^op-tx-(\d+)$`)
@@ -78,11 +108,12 @@ var opTxID = regexp.MustCompile(`^op-tx-(\d+)$`)
 // New builds a wallet from a starting state.
 func New(state LedgerState) *Wallet {
 	w := &Wallet{
-		accounts:     map[string]*account{},
-		transactions: map[string]StoredTransaction{},
-		tombstones:   map[string]bool{},
-		rounds:       map[string]string{},
-		nextRound:    1,
+		accounts:        map[string]*account{},
+		transactions:    map[string]StoredTransaction{},
+		tombstones:      map[string]bool{},
+		freespinsIssues: map[string]StoredFreespinsIssue{},
+		rounds:          map[string]string{},
+		nextRound:       1,
 	}
 	for id, a := range state.Accounts {
 		w.accounts[id] = &account{
@@ -103,6 +134,9 @@ func New(state LedgerState) *Wallet {
 	for _, id := range state.Tombstones {
 		w.tombstones[id] = true
 	}
+	for id, i := range state.FreespinsIssues {
+		w.freespinsIssues[id] = i
+	}
 	// Continue the id sequence rather than restarting it, so ids stay unique
 	// across a restored state.
 	w.nextTx = max + 1
@@ -115,9 +149,10 @@ func (w *Wallet) Snapshot() LedgerState {
 	defer w.mu.Unlock()
 
 	out := LedgerState{
-		Accounts:     map[string]StoredAccount{},
-		Transactions: map[string]StoredTransaction{},
-		Tombstones:   []string{},
+		Accounts:        map[string]StoredAccount{},
+		Transactions:    map[string]StoredTransaction{},
+		Tombstones:      []string{},
+		FreespinsIssues: map[string]StoredFreespinsIssue{},
 	}
 	for id, a := range w.accounts {
 		out.Accounts[id] = StoredAccount{Currency: a.currency, Balance: a.balance.String(), BetLimited: a.betLimited}
@@ -127,6 +162,9 @@ func (w *Wallet) Snapshot() LedgerState {
 	}
 	for id := range w.tombstones {
 		out.Tombstones = append(out.Tombstones, id)
+	}
+	for id, i := range w.freespinsIssues {
+		out.FreespinsIssues[id] = i
 	}
 	return out
 }
@@ -289,6 +327,72 @@ func (w *Wallet) Finish(_ context.Context, req beexar.FinishRequest, _ beexar.Re
 		return beexar.FinishResult{}, err
 	}
 	return beexar.FinishResult{Balance: a.balance}, nil
+}
+
+// RecordFreespinsIssue records an issue BEFORE you send it with
+// Client.IssueFreespins. /freespins/finish names only the issue_id, so this
+// record is what says whose wallet, in which currency, to credit — and a Finish
+// can never arrive for an issue you do not know.
+func (w *Wallet) RecordFreespinsIssue(issueID, accountID, currency string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if _, ok := w.freespinsIssues[issueID]; !ok {
+		w.freespinsIssues[issueID] = StoredFreespinsIssue{AccountID: accountID, Currency: currency, Status: FreespinsIssued}
+	}
+}
+
+// CancelFreespinsIssue marks an issue canceled once Beexar ACCEPTED your
+// Client.CancelFreespins. A refused cancel (620: already played out) leaves it
+// issued, because its /freespins/finish is on its way.
+func (w *Wallet) CancelFreespinsIssue(issueID string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if issue, ok := w.freespinsIssues[issueID]; ok && issue.Status == FreespinsIssued {
+		issue.Status = FreespinsCanceled
+		w.freespinsIssues[issueID] = issue
+	}
+}
+
+// FreespinsFinish credits what an issue's freespins won, once per issue_id.
+func (w *Wallet) FreespinsFinish(_ context.Context, req beexar.FreespinsFinishRequest, _ beexar.RequestContext) (beexar.FreespinsFinishResult, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	issue, ok := w.freespinsIssues[req.IssueID]
+	if !ok {
+		return beexar.FreespinsFinishResult{}, beexar.ErrInvalidFreespinsIssue(fmt.Sprintf("unknown freespins issue %s", req.IssueID))
+	}
+
+	switch issue.Status {
+	case FreespinsFinished:
+		// 1. Replay first, exactly as for id_provider: the platform retries
+		//    until it gets a 200, and the retry must credit nothing and answer
+		//    the balance stored the first time.
+		balance, err := beexar.ParseMoney(issue.BalanceAfter)
+		if err != nil {
+			// Never credit a finished issue again; a 500 makes the platform retry.
+			return beexar.FreespinsFinishResult{}, fmt.Errorf("freespins issue %s is finished but has no stored balance: %w", req.IssueID, err)
+		}
+		return beexar.FreespinsFinishResult{Balance: balance}, nil
+	case FreespinsCanceled:
+		// 2. A canceled issue has no result to take.
+		return beexar.FreespinsFinishResult{}, beexar.ErrFreespinsStateTransition(fmt.Sprintf("freespins issue %s was canceled", req.IssueID))
+	}
+
+	// 3. Credit, and record the answer with the issue — one transaction in a
+	//    real ledger, like everything else here. Zero is a valid result.
+	a, err := w.account(issue.AccountID)
+	if err != nil {
+		return beexar.FreespinsFinishResult{}, err
+	}
+	a.balance = a.balance.Add(req.Amount)
+	issue.Status = FreespinsFinished
+	issue.Amount = req.Amount.String()
+	issue.BalanceAfter = a.balance.String()
+	w.freespinsIssues[req.IssueID] = issue
+	return beexar.FreespinsFinishResult{Balance: a.balance}, nil
 }
 
 func (w *Wallet) account(id string) (*account, error) {

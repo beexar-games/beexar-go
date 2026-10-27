@@ -1,0 +1,11 @@
+{
+  "status": 400,
+  "body": {
+    "code": "invalid_argument",
+    "msg": "invalid signature",
+    "meta": {
+      "api_code": "403",
+      "api_message": "invalid signature"
+    }
+  }
+}

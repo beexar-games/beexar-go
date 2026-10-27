@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 )
 
@@ -28,21 +29,31 @@ func WithWarning(fn func(message string)) WalletServerOption {
 	return func(s *WalletServer) { s.warn = fn }
 }
 
-// WalletServer turns the four callbacks into one pure function.
+// WalletServer turns the callbacks into one pure function.
 //
 // Dispatch takes bytes and a signature and returns a status and a body. No
 // framework type crosses that boundary and it never sees a parsed body from the
 // outside, so signing the wrong thing is not expressible.
 type WalletServer struct {
-	handler      WalletHandler
+	handler WalletHandler
+	// freespins is the handler again when it implements FreespinsFinishHandler,
+	// nil when it does not.
+	freespins    FreespinsFinishHandler
 	apiSecret    string
 	maxBodyBytes int
 	warn         func(string)
 }
 
+// freespinsNotImplemented answers /freespins/finish for a handler without
+// FreespinsFinish.
+const freespinsNotImplemented = "freespins finish is not implemented by this wallet"
+
 // NewWalletServer builds a server. It fails on an empty secret: the gateway
 // treats an empty secret as an automatic verification failure, so a server
 // built with one would authenticate nothing while looking healthy.
+//
+// When handler also implements FreespinsFinishHandler, /freespins/finish is
+// served by it.
 func NewWalletServer(handler WalletHandler, apiSecret string, opts ...WalletServerOption) (*WalletServer, error) {
 	if handler == nil {
 		return nil, errors.New("beexar: handler is required")
@@ -50,8 +61,10 @@ func NewWalletServer(handler WalletHandler, apiSecret string, opts ...WalletServ
 	if strings.TrimSpace(apiSecret) == "" {
 		return nil, errors.New("beexar: apiSecret is required and must be non-empty")
 	}
+	freespins, _ := handler.(FreespinsFinishHandler)
 	s := &WalletServer{
 		handler:      handler,
+		freespins:    freespins,
 		apiSecret:    apiSecret,
 		maxBodyBytes: MaxBodyBytes,
 		warn:         func(string) {},
@@ -88,6 +101,11 @@ func (s *WalletServer) Dispatch(ctx context.Context, route Route, rawBody []byte
 func (s *WalletServer) dispatch(ctx context.Context, route Route, rawBody []byte, signature string, headers map[string]string) (DispatchResponse, error) {
 	if !validRoute(route) {
 		return DispatchResponse{}, ErrNotFound(fmt.Sprintf("unknown route: %s", route))
+	}
+	if route == RouteFreespinsFinish && s.freespins == nil {
+		// An operator that does not issue freespins has nothing to settle; the
+		// route answers the way an unknown one does.
+		return DispatchResponse{}, ErrNotFound(freespinsNotImplemented)
 	}
 	if len(rawBody) > s.maxBodyBytes {
 		return DispatchResponse{}, ErrBadRequest("request body too large")
@@ -175,6 +193,21 @@ func (s *WalletServer) dispatch(ctx context.Context, route Route, rawBody []byte
 			return DispatchResponse{}, err
 		}
 		return encodeJSON(wireBalanceResponse{Balance: out.Balance.String()})
+
+	case RouteFreespinsFinish:
+		var w wireFreespinsFinishRequest
+		if err := decode(rawBody, &w); err != nil {
+			return DispatchResponse{}, err
+		}
+		req, err := w.toRequest()
+		if err != nil {
+			return DispatchResponse{}, err
+		}
+		out, err := s.freespins.FreespinsFinish(ctx, req, rc)
+		if err != nil {
+			return DispatchResponse{}, err
+		}
+		return encodeJSON(wireBalanceResponse{Balance: out.Balance.String()})
 	}
 
 	return DispatchResponse{}, ErrNotFound("unknown route")
@@ -207,7 +240,7 @@ func (s *WalletServer) explainSignatureFailure(rawBody []byte, signature string)
 	}
 }
 
-// NewHandler wires the four callbacks into an http.Handler.
+// NewHandler wires the callbacks into an http.Handler.
 //
 // It matches on the path SUFFIX because the mount path belongs to you: the
 // gateway POSTs to the full callback URL configured in the backoffice, prefix
@@ -246,14 +279,24 @@ func (s *WalletServer) NewHandler() http.Handler {
 	})
 }
 
-// RouteFromPath maps a request path to one of the four callback routes,
-// matching on the suffix so any mount prefix works.
+// routesLongestFirst is Routes ordered for suffix matching: /freespins/finish
+// ends with /finish too, so it has to be tried before the shorter route.
+var routesLongestFirst = func() []Route {
+	out := slices.Clone(Routes)
+	slices.SortStableFunc(out, func(a, b Route) int { return len(b) - len(a) })
+	return out
+}()
+
+// RouteFromPath maps a request path to one of the callback routes, matching on
+// the suffix so any mount prefix works. The longest route wins, so
+// /wallet/freespins/finish is the freespins result and never the round's
+// /finish.
 func RouteFromPath(path string) (Route, bool) {
 	clean := strings.TrimRight(path, "/")
 	if clean == "" {
 		clean = "/"
 	}
-	for _, r := range Routes {
+	for _, r := range routesLongestFirst {
 		if clean == string(r) || strings.HasSuffix(clean, string(r)) {
 			return r, true
 		}

@@ -1,0 +1,11 @@
+{
+  "status": 400,
+  "body": {
+    "code": "invalid_argument",
+    "msg": "unknown freespins issue fs-9",
+    "meta": {
+      "api_code": "610",
+      "api_message": "unknown freespins issue fs-9"
+    }
+  }
+}

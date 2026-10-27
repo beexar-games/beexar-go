@@ -50,6 +50,11 @@ type wireFinishRequest struct {
 	SessionID string `json:"session_id"`
 }
 
+type wireFreespinsFinishRequest struct {
+	IssueID string `json:"issue_id"`
+	Amount  string `json:"amount"`
+}
+
 type wireBalanceResponse struct {
 	Balance string `json:"balance"`
 }

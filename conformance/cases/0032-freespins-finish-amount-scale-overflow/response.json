@@ -1,0 +1,11 @@
+{
+  "status": 400,
+  "body": {
+    "code": "invalid_argument",
+    "msg": "amount: not a valid decimal amount",
+    "meta": {
+      "api_code": "400",
+      "api_message": "amount: not a valid decimal amount"
+    }
+  }
+}

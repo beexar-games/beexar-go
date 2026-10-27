@@ -1,0 +1,11 @@
+{
+  "status": 400,
+  "body": {
+    "code": "invalid_argument",
+    "msg": "freespins issue fs-1 was canceled",
+    "meta": {
+      "api_code": "605",
+      "api_message": "freespins issue fs-1 was canceled"
+    }
+  }
+}

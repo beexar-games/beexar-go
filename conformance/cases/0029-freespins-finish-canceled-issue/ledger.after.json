@@ -1,0 +1,17 @@
+{
+  "accounts": {
+    "player_1": {
+      "currency": "EUR",
+      "balance": "100.00"
+    }
+  },
+  "transactions": {},
+  "tombstones": [],
+  "freespins_issues": {
+    "fs-1": {
+      "account_id": "player_1",
+      "currency": "EUR",
+      "status": "canceled"
+    }
+  }
+}

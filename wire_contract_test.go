@@ -88,6 +88,8 @@ func TestWireStructsMatchTheContract(t *testing.T) {
 		{"RoundRollbackResponseTransaction", wireRollbackResponseTransaction{}},
 		{"RoundFinishRequest", wireFinishRequest{}},
 		{"RoundFinishResponse", wireBalanceResponse{}}, // same single `balance` field
+		{"FreespinsFinishRequest", wireFreespinsFinishRequest{}},
+		{"FreespinsFinishResponse", wireBalanceResponse{}}, // same single `balance` field
 		{"ErrorResponse", ErrorEnvelope{}},
 		{"ErrorResponseMeta", ErrorMeta{}},
 	}
@@ -138,6 +140,7 @@ func TestRequiredFieldsAreValidated(t *testing.T) {
 		"RoundBetWinRequestTransaction":   {"amount", "id_provider", "type"},
 		"RoundRollbackRequestTransaction": {"id_provider", "original_id_provider", "type"},
 		"RoundFinishRequest":              {"account_id", "currency", "round_id"},
+		"FreespinsFinishRequest":          {"amount", "issue_id"},
 	}
 
 	for schema, fields := range enforced {

@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
+	"strings"
 	"testing"
 
 	beexar "github.com/beexar-games/beexar-go"
@@ -15,6 +17,9 @@ import (
 // The cross-language conformance suite. The same fixtures are run by the Node,
 // PHP and Python SDKs, so behaviour cannot drift between languages while there
 // is only one set of cases.
+
+// wellFormedSignature is the shape the gateway sends: 64 lowercase hex characters.
+var wellFormedSignature = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 type manifest struct {
 	FixtureVersion int `json:"fixture_version"`
@@ -93,9 +98,12 @@ func TestWalletConformance(t *testing.T) {
 			readJSON(t, &want, "cases", c.Dir, "response.json")
 
 			// A fixture whose stored signature does not match its own bytes
-			// would quietly test nothing, so the suite re-derives it.
+			// would quietly test nothing, so the suite re-derives it — but
+			// only a well-formed one: the all-zeros `wrong` sentinel and a
+			// deliberately malformed header (0033) are the case, not a
+			// drifted fixture.
 			signature := meta.Headers["X-REQUEST-SIGN"]
-			if signature != "" && signature != "0000000000000000000000000000000000000000000000000000000000000000" {
+			if wellFormedSignature.MatchString(signature) && signature != strings.Repeat("0", 64) {
 				if got := beexar.Sign(body, secret); got != signature {
 					t.Fatalf("fixture signature does not match its own body:\n stored %s\n derived %s", signature, got)
 				}
@@ -147,15 +155,19 @@ func ledgerEqual(t *testing.T, got, want inmemory.LedgerState) bool {
 		if s.Transactions == nil {
 			s.Transactions = map[string]inmemory.StoredTransaction{}
 		}
+		if s.FreespinsIssues == nil {
+			s.FreespinsIssues = map[string]inmemory.StoredFreespinsIssue{}
+		}
 		tomb := map[string]bool{}
 		for _, id := range s.Tombstones {
 			tomb[id] = true
 		}
 		raw, _ := json.Marshal(struct {
-			Accounts     map[string]inmemory.StoredAccount     `json:"accounts"`
-			Transactions map[string]inmemory.StoredTransaction `json:"transactions"`
-			Tombstones   map[string]bool                       `json:"tombstones"`
-		}{s.Accounts, s.Transactions, tomb})
+			Accounts        map[string]inmemory.StoredAccount        `json:"accounts"`
+			Transactions    map[string]inmemory.StoredTransaction    `json:"transactions"`
+			Tombstones      map[string]bool                          `json:"tombstones"`
+			FreespinsIssues map[string]inmemory.StoredFreespinsIssue `json:"freespins_issues"`
+		}{s.Accounts, s.Transactions, tomb, s.FreespinsIssues})
 		out := map[string]any{}
 		_ = json.Unmarshal(raw, &out)
 		return out

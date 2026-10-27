@@ -4,8 +4,10 @@ info:
   description: |
     SoftSwiss Game Aggregator inbound integration (Provider API v2 style).
     These are the endpoints a SoftSwiss-integrated operator calls to launch
-    games. Each platform has its OWN spec, endpoints, and auth scheme; this
-    one uses HMAC-SHA256 (X-REQUEST-SIGN) over the raw request body.
+    games, to issue and cancel freespins, and to read the bet levels they are
+    issued at (docs/freespins.md). Each platform has its OWN spec, endpoints, and auth
+    scheme; this one uses HMAC-SHA256 (X-REQUEST-SIGN) over the raw request
+    body.
 
     ## Authentication
 
@@ -19,9 +21,9 @@ info:
     ## Operator gating
 
     An operator may only call the endpoints for its own `integration_type`.
-    Calling a SoftSwiss endpoint as a non-SoftSwiss operator returns 403
-    `INTEGRATION_TYPE_MISMATCH`.
-  version: v.2026.06.20
+    Calling a SoftSwiss endpoint as a non-SoftSwiss operator returns 400 with
+    `meta.api_code` 420.
+  version: v.2026.10.26
 
 servers:
   - url: https://gateway.beexar.com
@@ -30,6 +32,10 @@ servers:
 tags:
   - name: softswiss-launcher
     description: SoftSwiss game launcher endpoints
+  - name: softswiss-bet
+    description: SoftSwiss bet levels (the stakes freespins are issued at)
+  - name: softswiss-freespins
+    description: SoftSwiss freespins issued by the operator (docs/freespins.md)
 
 security: []
 
@@ -134,6 +140,195 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/softswiss/bet/levels:
+    post:
+      operationId: softswissBetLevels
+      tags: [softswiss-bet]
+      summary: Bet levels of the provider's games (SoftSwiss Bet/Levels)
+      description: |
+        SoftSwiss `a8r_provider.Bet/Levels`: the bet levels of every game the
+        operator can issue freespins for, per currency. A level is the TOTAL
+        bet of one round; `Freespins/Issue` names a level, and the bet it
+        stands for is the amount listed here for the game and the player's
+        currency at the time of the issue.
+
+        - Levels run 1..N without gaps, amounts strictly ascending.
+        - Each game appears once; games share an entry only when their levels
+          are identical in every currency.
+        - Unknown games and currencies in the filters are ignored, not
+          refused. Without `games` / `currencies` every game / currency is
+          listed.
+        - A game is listed only when its engine plays operator freespins. A
+          game whose RGS engine does not answer at the moment is left out as
+          well — temporarily: ask again later.
+      security:
+        - requestSign: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BetLevelsRequest'
+      responses:
+        '200':
+          description: The bet levels
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BetLevelsResponse'
+        '400':
+          description: |
+            Client error. `code` is always `invalid_argument`; the specific
+            meaning is in `meta.api_code` — 400 malformed body, 404 casino_id
+            unknown, 410 casino disabled, 420 endpoint not available for this
+            integration_type.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: |
+            Invalid request signature (`meta.api_code` 403), the only case
+            answered with 403.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/softswiss/freespins/issue:
+    post:
+      operationId: softswissFreespinsIssue
+      tags: [softswiss-freespins]
+      summary: Issue freespins to a player (SoftSwiss Freespins/Issue)
+      description: |
+        SoftSwiss `a8r_provider.Freespins/Issue`: give the player `account`
+        `freespins_quantity` free rounds in the listed games, at the bet that
+        `bet_level` stands for in each game and the account currency
+        (Bet/Levels), playable until `valid_until`. The quantity is shared by
+        all the listed games, not given in each.
+
+        The player just launches a listed game (Launcher/Real, nothing new in
+        it): the game opens with the freespins, its bet locked. Their rounds
+        never reach the wallet; when the issue is played out, or expires with
+        rounds played, the total won is reported once with
+        `Freespins/Finish` (the operator's freespins finish callback URL).
+
+        Repeating an `issue_id` with the same terms answers as the first
+        Issue did, `200 {}`, without issuing twice — the idempotency SoftSwiss
+        asks of the provider (Provider API v.2026.06.22). DOCUMENTED
+        DEVIATION: a repeat with OTHER terms under a known `issue_id` is
+        refused (`meta.api_code` 610, `api_message` names the fields) rather
+        than answered 200 — a second set of terms under one id is a caller
+        bug, and a silent 200 would hide which terms the player actually got.
+      security:
+        - requestSign: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FreespinsIssueRequest'
+      responses:
+        '200':
+          description: The freespins are issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FreespinsIssueResponse'
+        '400':
+          description: |
+            Client error. `code` is always `invalid_argument`; the specific
+            meaning is in `meta.api_code` — 400 malformed body or
+            freespins_quantity above 10000, 404 casino_id unknown, 406
+            freespins not available for the casino (no freespins finish
+            callback URL configured), 410 casino disabled, 420 endpoint not
+            available for this integration_type, 154 currency not allowed,
+            405 a requested game is unknown to the casino, 608 a requested
+            game plays no freespins, 601 a requested game has no bet levels
+            in the currency or bet_level is above them, 602 no game, 603 bad
+            valid_until, 605 the issue_id was canceled
+            before it was issued, 610 the issue_id was issued with other
+            terms.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Invalid request signature (`meta.api_code` 403).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: |
+            Internal server error (retryable). Also answered when a requested
+            game is temporarily unavailable because its RGS engine did not
+            answer, or the casino cannot be looked up for the moment: the
+            game is hidden or the casino unknown for the moment, not refused
+            — retry the same request later (a 405, 608 or 601 would be
+            final).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/softswiss/freespins/cancel:
+    post:
+      operationId: softswissFreespinsCancel
+      tags: [softswiss-freespins]
+      summary: Cancel issued freespins (SoftSwiss Freespins/Cancel)
+      description: |
+        SoftSwiss `a8r_provider.Freespins/Cancel`, at any time — even while
+        the player is playing them. A canceled issue never sends its
+        `Freespins/Finish`: what its rounds won is forfeited. A round already
+        playing finishes. Canceling an `issue_id` that was never issued is
+        accepted and remembered: an Issue with that id arriving later is
+        refused (605).
+      security:
+        - requestSign: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FreespinsCancelRequest'
+      responses:
+        '200':
+          description: The freespins are canceled (or already were)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FreespinsCancelResponse'
+        '400':
+          description: |
+            Client error. `code` is always `invalid_argument`; the specific
+            meaning is in `meta.api_code` — 400 malformed body, 404 casino_id
+            unknown, 410 casino disabled, 420 endpoint not available for this
+            integration_type, 611 the issue has already expired, 620 the
+            issue has been played and can't be canceled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Invalid request signature (`meta.api_code` 403).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error (retryable)
           content:
             application/json:
               schema:
@@ -257,12 +452,200 @@ components:
           properties:
             return_url:
               type: string
-              pattern: '^(https?|app):\/\/([^\/?#]+)([^?#]*)(\?[^#]*)?(#.*)?$'
-              description: URL to redirect after closing game
+              # The SoftSwiss launcher URL shape (Provider API v.2026.06.22):
+              # any `scheme://host…`, the scheme letters, digits and underscores.
+              pattern: '^([A-Za-z0-9_]+):\/\/([^\/?#]+)([^?#]*)(\?[^#]*)?(#.*)?$'
+              description: >-
+                URL of the game's Home (lobby) button. When given, the button
+                leads there; when omitted, the game shows no Home button.
         jurisdiction:
           type: string
           pattern: '^[A-Z]{2}(-[A-Z]{2})?$'
           description: Two-letter country code, supports region identifiers (e.g. CA-ON)
+
+    # Mirrors SoftSwiss FreespinsIssueRequest (examples/provider-api.yaml)
+    # field-for-field. DOCUMENTED DEVIATIONS, none stricter than SoftSwiss on
+    # a request SoftSwiss sends: `issue_id` carries maxLength 255 (stored in a
+    # VARCHAR(255)); the valid_until pattern escapes its dot (SoftSwiss writes
+    # `.`, any character); `account` is our Account, which requires only id
+    # and currency; duplicate games are accepted and counted once (SoftSwiss
+    # puts uniqueItems on the items, where it means nothing); `games` may be
+    # empty at the schema (SoftSwiss has minItems 1) so that the policy can
+    # answer 602 "no game", the code SoftSwiss defines for exactly that — a
+    # schema refusal would hide it behind a generic 400.
+    FreespinsIssueRequest:
+      type: object
+      additionalProperties: true
+      required:
+        - casino_id
+        - issue_id
+        - games
+        - freespins_quantity
+        - bet_level
+        - valid_until
+        - account
+      properties:
+        casino_id:
+          type: string
+          minLength: 1
+          description: Casino identifier (operator slug)
+        issue_id:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Freespins issue identifier on the casino's side
+        games:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          description: |
+            Game identifiers (game slugs). The quantity is shared by all of
+            them, not given in each. An empty list is refused with
+            `meta.api_code` 602.
+        freespins_quantity:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Number of free rounds (at most 10000)
+        bet_level:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Bet level (Bet/Levels) — the bet of every free round
+        valid_until:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?Z$'
+          description: |
+            Until when the freespins are playable, at most 1 month ahead
+            (SoftSwiss time format, e.g. 2025-12-31T15:30:00Z)
+        account:
+          $ref: '#/components/schemas/Account'
+
+    FreespinsIssueResponse:
+      type: object
+      description: Empty on success (SoftSwiss FreespinsIssueResponse).
+
+    # Mirrors SoftSwiss FreespinsCancelRequest field-for-field.
+    FreespinsCancelRequest:
+      type: object
+      additionalProperties: true
+      required:
+        - casino_id
+        - issue_id
+      properties:
+        casino_id:
+          type: string
+          minLength: 1
+          description: Casino identifier (operator slug)
+        issue_id:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Freespins issue identifier on the casino's side
+
+    FreespinsCancelResponse:
+      type: object
+      description: Empty on success (SoftSwiss FreespinsCancelResponse).
+
+    # Mirrors SoftSwiss BetLevelsRequest (examples/provider-api.yaml)
+    # field-for-field; additionalProperties: true as on every inbound request.
+    BetLevelsRequest:
+      type: object
+      additionalProperties: true
+      required:
+        - casino_id
+      properties:
+        casino_id:
+          type: string
+          minLength: 1
+          description: Casino identifier (operator slug)
+        games:
+          type: array
+          items:
+            type: string
+          description: |
+            Game identifiers (game slugs, `identifier2` in the SoftSwiss
+            game list). Unknown ones are ignored; absent = every game.
+        currencies:
+          type: array
+          items:
+            type: string
+          description: |
+            Currency codes. Unknown ones are ignored; absent = every
+            currency.
+
+    # Mirrors SoftSwiss BetLevelsResponse / BetLevelData / CurrencyBetLevels /
+    # BetLevel. DOCUMENTED DEVIATIONS (we only ever send these, so they only
+    # tighten what we promise): every field is required, and `bet_level`
+    # carries `minimum: 1` where SoftSwiss writes the no-op `minLength: 1`.
+    BetLevelsResponse:
+      type: object
+      required:
+        - bet_levels
+      properties:
+        bet_levels:
+          type: array
+          items:
+            $ref: '#/components/schemas/BetLevelData'
+          description: |
+            One entry per group of games whose bet levels are identical in
+            every currency; each game appears once.
+
+    BetLevelData:
+      type: object
+      required:
+        - games
+        - currencies
+      properties:
+        games:
+          type: array
+          minItems: 1
+          items:
+            type: string
+          description: Game identifiers (game slugs)
+        currencies:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CurrencyBetLevels'
+
+    CurrencyBetLevels:
+      type: object
+      required:
+        - currency
+        - bet_levels
+      properties:
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 4
+          pattern: '^[A-Z0-9]{3,4}$'
+          description: Three- or four-letter currency code
+        bet_levels:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/BetLevel'
+          description: Levels 1..N without gaps, amounts strictly ascending
+
+    BetLevel:
+      type: object
+      required:
+        - bet_level
+        - amount
+      properties:
+        bet_level:
+          type: integer
+          format: int32
+          minimum: 1
+          description: Bet level
+        amount:
+          type: string
+          pattern: '^\d{1,18}(\.\d{1,12})?$'
+          description: |
+            The TOTAL bet of one round at this level in the currency's major
+            unit (never a bet per line).
 
     LauncherResponse:
       type: object
@@ -312,19 +695,28 @@ components:
           type: string
           description: API error message — the specific reason / offending field.
 
-    # Mirrors SoftSwiss LauncherRealRequestUrls: the SoftSwiss URL pattern (which
-    # also allows the app:// scheme), not a stricter `format: uri` + maxLength.
+    # Mirrors SoftSwiss LauncherRealRequestUrls (examples/provider-api.yaml,
+    # v.2026.06.22): the SoftSwiss URL pattern — any `scheme://host…` whose
+    # scheme is letters, digits and underscores, so a casino's native app can
+    # hand its lobby as `myapp://lobby` — not a stricter `format: uri` +
+    # maxLength. The game clients refuse the schemes a browser would run as
+    # code (javascript, data, …) before opening one (shared/utils/openOperatorUrl).
     LauncherURLs:
       type: object
       properties:
         return_url:
           type: string
-          pattern: '^(https?|app):\/\/([^\/?#]+)([^?#]*)(\?[^#]*)?(#.*)?$'
-          description: URL to redirect player after game
+          pattern: '^([A-Za-z0-9_]+):\/\/([^\/?#]+)([^?#]*)(\?[^#]*)?(#.*)?$'
+          description: >-
+            URL of the game's Home (lobby) button. When given, the button leads
+            there; when omitted, the game shows no Home button.
         deposit_url:
           type: string
-          pattern: '^(https?|app):\/\/([^\/?#]+)([^?#]*)(\?[^#]*)?(#.*)?$'
-          description: URL for player to make a deposit
+          pattern: '^([A-Za-z0-9_]+):\/\/([^\/?#]+)([^?#]*)(\?[^#]*)?(#.*)?$'
+          description: >-
+            URL of the game's Deposit (cashier) button and of the low-balance
+            prompt. When given, they lead there; when omitted, the game shows
+            no Deposit button.
 
     # Player account — mirrors the SoftSwiss provider-API `Account` definition
     # (examples/provider-api.yaml) field-for-field, so beexar validates EXACTLY

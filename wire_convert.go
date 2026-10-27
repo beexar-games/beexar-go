@@ -154,3 +154,17 @@ func (w wireFinishRequest) toRequest() (FinishRequest, error) {
 	}
 	return FinishRequest{AccountID: accountID, Currency: currency, RoundID: roundID, SessionID: w.SessionID}, nil
 }
+
+func (w wireFreespinsFinishRequest) toRequest() (FreespinsFinishRequest, error) {
+	issueID, err := requireString(w.IssueID, "issue_id")
+	if err != nil {
+		return FreespinsFinishRequest{}, err
+	}
+	// Zero is a valid result here — the freespins won nothing — so unlike a
+	// /betwin amount it is not refused. The shape rules are the same.
+	amount, err := ParseMoney(w.Amount)
+	if err != nil {
+		return FreespinsFinishRequest{}, ErrBadRequest("amount: not a valid decimal amount")
+	}
+	return FreespinsFinishRequest{IssueID: issueID, Amount: amount}, nil
+}

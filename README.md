@@ -153,6 +153,76 @@ Your handler has **15 seconds**. The platform retries 5xx and timeouts for up to
 30 seconds with the same `id_provider`; it does not retry insufficient funds,
 bet limits, bad requests or signature failures.
 
+## Freespins (optional)
+
+Freespins follow the SoftSwiss Freespins API one to one: you give a player N
+free rounds at a fixed bet, Beexar plays them without touching the wallet, and
+reports what they won once, when the issue is over. Three calls go out from
+you; one callback comes back.
+
+```go
+// The bet levels each game offers, per currency. A level is the total bet of one round.
+levels, err := client.BetLevels(ctx, beexar.BetLevelsRequest{Games: []string{"dice"}, Currencies: []string{"EUR"}})
+
+// Record the issue on YOUR side first — the result will name only its issue_id.
+ledger.RecordFreespinsIssue("fs-123", "player_123", "EUR")
+err = client.IssueFreespins(ctx, beexar.FreespinsIssueRequest{
+    IssueID:           "fs-123",
+    Games:             []string{"dice"},
+    FreespinsQuantity: 10,
+    BetLevel:          1,
+    ValidUntil:        time.Now().UTC().Add(7 * 24 * time.Hour).Format(time.RFC3339), // at most one month ahead
+    Account:           beexar.LaunchAccount{ID: "player_123", Currency: "EUR"},
+})
+// The player launches the game as usual (LaunchReal) and finds them there.
+
+err = client.CancelFreespins(ctx, beexar.FreespinsCancelRequest{IssueID: "fs-123"}) // any time; never reported
+```
+
+A repeated `IssueFreespins` with the same terms answers like the first, so retry
+a timeout with the **same** request — a recomputed `ValidUntil` is other terms,
+refused with api_code 610.
+
+The result arrives on a fifth callback, `/freespins/finish`, carrying the issue
+id and the amount won — zero included. Implement `beexar.FreespinsFinishHandler`
+on the same value you pass to `NewWalletServer`:
+
+```go
+func (w *Wallet) FreespinsFinish(ctx context.Context, req beexar.FreespinsFinishRequest, _ beexar.RequestContext) (beexar.FreespinsFinishResult, error) {
+    // One database transaction, like BetWin.
+    issue, ok := w.freespinsIssue(ctx, req.IssueID)
+    switch {
+    case !ok:
+        return beexar.FreespinsFinishResult{}, beexar.ErrInvalidFreespinsIssue("")       // api_code 610
+    case issue.Finished:
+        return beexar.FreespinsFinishResult{Balance: issue.BalanceAfter}, nil           // a retry: credit nothing
+    case issue.Canceled:
+        return beexar.FreespinsFinishResult{}, beexar.ErrFreespinsStateTransition("") // api_code 605: Beexar accepted your cancel
+    }
+    return beexar.FreespinsFinishResult{Balance: w.credit(ctx, issue, req.Amount)}, nil
+}
+```
+
+- It is sent **once per issue** — when the issue is played out, or expires with
+  spins played — and retried with the same body (after 1, 3 and 5 minutes, then
+  every 5) until you answer 200. Each attempt has the same **15 seconds** as the
+  round callbacks. Credit once per issue id; a repeat returns the balance you
+  stored the first time.
+- Answer `605` only for an issue whose cancel Beexar accepted — Beexar never
+  sends a Finish for one; a `605` to a Finish you did receive is retried like
+  any refusal.
+- Configure it in the backoffice as the operator's **freespins finish URL**, the
+  fifth callback URL next to the four, e.g.
+  `https://your-host/wallet/freespins/finish`. Leave it empty if you do not
+  offer freespins — `IssueFreespins` then answers api_code 406.
+- A handler without `FreespinsFinish` keeps compiling and working unchanged;
+  the route then answers like an unknown one (api_code 404).
+- `NewHandler` matches paths on their suffix, longest route first, so
+  `/wallet/freespins/finish` and `/wallet/finish` live under one prefix.
+
+The reference wallet implements it end to end:
+[`examples/inmemory`](./examples/inmemory/wallet.go).
+
 ## Types come from the spec
 
 The types in this package track the published OpenAPI documents (`openapi/` in
